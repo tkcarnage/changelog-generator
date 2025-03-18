@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { addDays, format } from 'date-fns'
 import { Calendar } from '@/components/ui/calendar'
 import { Button } from '@/components/ui/button'
@@ -45,52 +45,92 @@ interface ChangelogFormProps {
   mutation: UseMutationResult<ChangelogData, Error, GenerateChangelogParams>
 }
 
-const useChangelogProgress = (owner?: string, repo?: string) => {
+const useChangelogProgress = () => {
   const [progress, setProgress] = useState<ChangelogProgress>({ progress: 0, step: '' })
+  const [isConnected, setIsConnected] = useState(false)
+  const eventSourceRef = useRef<EventSource | null>(null)
 
-  useEffect(() => {
-    if (!owner || !repo) {
-      setProgress({ progress: 0, step: '' })
-      return
+  const establishConnection = useCallback(async (owner: string, repo: string) => {
+    // Clean up any existing connection
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close()
+      eventSourceRef.current = null
     }
 
-    const eventSource = new EventSource(`/api/generate-changelog/progress?owner=${owner}&repo=${repo}`)
-    
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data) as ChangelogProgress
-        if (data.error) {
-          toast.error(data.error)
-          eventSource.close()
-          return
-        }
-
-        setProgress({
-          progress: Math.min(Math.round(data.progress), 100),
-          step: data.step
-        })
-
-        // Close SSE connection when complete
-        if (data.step === 'Complete' && data.progress === 100) {
-          eventSource.close()
-        }
-      } catch (error) {
-        console.error('Error parsing SSE data:', error)
+    return new Promise<void>((resolve, reject) => {
+      const eventSource = new EventSource(`/api/generate-changelog/progress?owner=${owner}&repo=${repo}`)
+      eventSourceRef.current = eventSource
+      
+      // Set a connection timeout
+      const connectionTimeout = setTimeout(() => {
         eventSource.close()
+        reject(new Error('Connection timeout'))
+      }, 5000)
+
+      eventSource.onopen = () => {
+        clearTimeout(connectionTimeout)
+        setIsConnected(true)
+        resolve()
       }
-    }
 
-    eventSource.onerror = () => {
-      eventSource.close()
-      toast.error('Lost connection to server')
-    }
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data) as ChangelogProgress
+          
+          // Ignore keepalive messages
+          if (data.step === 'keepalive') return
 
-    return () => {
-      eventSource.close()
-    }
-  }, [owner, repo])
+          if (data.error) {
+            console.error('SSE Error received:', data.error)
+            eventSource.close()
+            setProgress({ progress: 0, step: '' })
+            setIsConnected(false)
+            throw new Error(data.error)
+          }
 
-  return progress
+          setProgress({
+            progress: Math.min(Math.round(data.progress), 100),
+            step: data.step
+          })
+
+          // Close connection when complete
+          if (data.step === 'Complete' && data.progress === 100) {
+            console.log('Generation complete, closing connection')
+            eventSource.close()
+            setProgress({ progress: 0, step: '' })
+            setIsConnected(false)
+          }
+        } catch (error) {
+          console.error('Error parsing SSE data:', error)
+          eventSource.close()
+          setProgress({ progress: 0, step: '' })
+          setIsConnected(false)
+          throw error
+        }
+      }
+
+      eventSource.onerror = (error) => {
+        console.error('SSE Connection error:', error)
+        clearTimeout(connectionTimeout)
+        eventSource.close()
+        setProgress({ progress: 0, step: '' })
+        setIsConnected(false)
+        reject(new Error('Failed to establish connection'))
+      }
+    })
+  }, [])
+
+  const closeConnection = useCallback(() => {
+    if (eventSourceRef.current) {
+      console.log('Closing SSE connection')
+      eventSourceRef.current.close()
+      eventSourceRef.current = null
+      setIsConnected(false)
+      setProgress({ progress: 0, step: '' })
+    }
+  }, [])
+
+  return { progress, isConnected, establishConnection, closeConnection }
 }
 
 export default function ChangelogForm({ onGenerateStart, onGenerateComplete, mutation }: ChangelogFormProps) {
@@ -99,13 +139,8 @@ export default function ChangelogForm({ onGenerateStart, onGenerateComplete, mut
     from: addDays(new Date(), -14),
     to: new Date(),
   })
-  const [owner, setOwner] = useState<string>()
-  const [repoName, setRepoName] = useState<string>()
-
-  const progress = useChangelogProgress(
-    mutation.isPending ? owner : undefined,
-    mutation.isPending ? repoName : undefined
-  )
+  const [isGenerating, setIsGenerating] = useState(false)
+  const { progress, establishConnection, closeConnection } = useChangelogProgress()
 
   const handleGenerate = async () => {
     if (!repoUrl) {
@@ -120,7 +155,6 @@ export default function ChangelogForm({ onGenerateStart, onGenerateComplete, mut
       toast.error('Please select an end date')
       return
     }
-    // Validate that the end date is not before the start date
     if (date.to < date.from) {
       toast.error('End date cannot be before start date')
       return
@@ -128,29 +162,46 @@ export default function ChangelogForm({ onGenerateStart, onGenerateComplete, mut
 
     try {
       const url = new URL(repoUrl)
-      const [urlOwner, urlRepo] = url.pathname.split('/').filter(Boolean)
+      const [owner, repo] = url.pathname.split('/').filter(Boolean)
 
-      if (!urlOwner || !urlRepo || url.hostname !== 'github.com') {
+      if (!owner || !repo || url.hostname !== 'github.com') {
         throw new Error('Please enter a valid GitHub repository URL (e.g., https://github.com/owner/repo)')
       }
 
-      setOwner(urlOwner)
-      setRepoName(urlRepo)
-
+      setIsGenerating(true)
       onGenerateStart()
-      
+
+      // Step 1: Establish SSE connection
+      console.log('Establishing SSE connection...')
+      await establishConnection(owner, repo)
+
+      // Step 2: Generate changelog
+      console.log('Generating changelog...')
       await mutation.mutateAsync({
-        owner: urlOwner,
-        repo: urlRepo,
+        owner,
+        repo,
         startDate: format(date.from, 'yyyy-MM-dd'),
         endDate: format(date.to, 'yyyy-MM-dd'),
       })
 
-      await onGenerateComplete()
+      // Step 3: Complete
+      onGenerateComplete()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Invalid GitHub URL')
+      console.error('Generation failed:', error)
+      closeConnection()
+      setIsGenerating(false)
+      toast.error(error instanceof Error ? error.message : 'Failed to generate changelog')
+    } finally {
+      setIsGenerating(false)
     }
   }
+
+  // Clean up connection on unmount
+  useEffect(() => {
+    return () => {
+      closeConnection()
+    }
+  }, [closeConnection])
 
   return (
     <>
@@ -273,9 +324,9 @@ export default function ChangelogForm({ onGenerateStart, onGenerateComplete, mut
       <Button
         className="w-full"
         onClick={handleGenerate}
-        disabled={mutation.isPending}
+        disabled={mutation.isPending || isGenerating}
       >
-        {mutation.isPending ? 'Generating Changelog...' : 'Generate Changelog'}
+        {mutation.isPending || isGenerating ? 'Generating Changelog...' : 'Generate Changelog'}
       </Button>
     </>
   )

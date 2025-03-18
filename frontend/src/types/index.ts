@@ -13,6 +13,7 @@ export interface Repository {
   updated_at: string
   html_url: string
   default_branch: string
+  lastGeneratedAt?: string | null
   license?: {
     name: string
     url: string

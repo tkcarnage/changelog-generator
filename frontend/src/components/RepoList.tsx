@@ -19,7 +19,11 @@ const RepoCard = ({ repo }: { repo: Repository }) => (
         <div className="mt-2 flex items-center gap-4 text-sm text-slate-500">
           {repo.language && <span>{repo.language}</span>}
           <span>⭐ {repo.stargazers_count}</span>
-          <span>Updated {new Date(repo.updated_at).toLocaleDateString()}</span>
+          {repo.lastGeneratedAt ? (
+            <span>Generated {new Date(repo.lastGeneratedAt).toLocaleDateString()}</span>
+          ) : (
+            <span>Never generated</span>
+          )}
         </div>
         {repo.topics?.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-2">

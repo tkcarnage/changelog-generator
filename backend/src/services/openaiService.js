@@ -9,6 +9,44 @@ const configuration = new Configuration({
 });
 const openai = new OpenAIApi(configuration);
 
+// Constants
+const MAX_RETRIES = 3;
+const INITIAL_RETRY_DELAY = 1000; // 1 second
+const MODEL_NAME = "gpt-4o-mini"; // Standardized model name
+
+/**
+ * Implements exponential backoff retry logic
+ * @param {Function} operation - Function to retry
+ * @param {number} maxRetries - Maximum number of retries
+ * @param {number} initialDelay - Initial delay in milliseconds
+ * @returns {Promise<any>} - Result of the operation
+ */
+const withRetry = async (operation, maxRetries = MAX_RETRIES, initialDelay = INITIAL_RETRY_DELAY) => {
+  let lastError;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      
+      if (attempt === maxRetries) break;
+      
+      // Check if error is rate limit related
+      const isRateLimit = error.response?.status === 429 || 
+                         error.message.toLowerCase().includes('rate limit');
+      
+      if (!isRateLimit) throw error;
+      
+      const delay = initialDelay * Math.pow(2, attempt);
+      console.log(`Rate limit hit. Retrying in ${delay}ms... (Attempt ${attempt + 1}/${maxRetries})`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  throw lastError;
+};
+
 /**
  * Formats the system prompt to ensure proper JSON response
  * @param {string} basePrompt - The base prompt content
@@ -31,15 +69,15 @@ Remember: Return ONLY the JSON object, nothing else.`;
 /**
  * Sends a prompt to OpenAI's chat completions endpoint and returns the response content.
  * @param {string} prompt - The prompt content.
- * @param {string} [model="o3-mini"] - The model to use.
+ * @param {string} [model=MODEL_NAME] - The model to use.
  * @param {number} [temperature=0.3] - The sampling temperature.
  * @param {Object} [jsonFormat] - The expected JSON format to include in the prompt.
  * @returns {Promise<string>} - The message content from OpenAI's response.
  */
 export const sendChatPrompt = async (
   prompt,
-  model = "o3-mini",
-  temperature = 0.3,
+  model = MODEL_NAME,
+  temperature = 0.1,
   jsonFormat
 ) => {
   const systemPrompt = jsonFormat
@@ -61,18 +99,15 @@ export const sendChatPrompt = async (
     model,
     messages,
     temperature,
-    response_format: { type: "json_object" }, // Request JSON response
+    response_format: { type: "json_object" },
   };
 
-  try {
-    // Log token count and payload for debugging
-    const tokenCount = calculateTokenCount(systemPrompt);
-    console.log(`Token count for the prompt: ${tokenCount}`);
-    console.log(
-      "Payload being sent to OpenAI:",
-      JSON.stringify(payload, null, 2)
-    );
+  // Log token count for debugging
+  const tokenCount = calculateTokenCount(systemPrompt);
+  console.log(`Token count for the prompt: ${tokenCount}`);
+  console.log("Payload being sent to OpenAI:", JSON.stringify(payload, null, 2));
 
+  return await withRetry(async () => {
     const response = await openai.createChatCompletion(payload);
     const content = response.data.choices[0]?.message?.content;
 
@@ -88,8 +123,5 @@ export const sendChatPrompt = async (
       console.error("Invalid JSON response from OpenAI:", content);
       throw new Error("OpenAI response was not valid JSON");
     }
-  } catch (error) {
-    console.error("OpenAI API Error:", error);
-    throw new Error(`OpenAI API Error: ${error.message}`);
-  }
+  });
 };

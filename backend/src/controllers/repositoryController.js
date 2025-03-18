@@ -9,27 +9,12 @@ import Repository from "../models/repository.js";
  */
 export const getStoredRepositories = async (req, res, next) => {
   try {
-    const repositories = await Repository.find({}).lean();
+    // Find all repositories and sort by lastGeneratedAt
+    const repositories = await Repository.find({})
+      .sort({ lastGeneratedAt: -1 })
+      .lean();
 
-    // Format repositories to match frontend Repository type
-    const formattedRepos = repositories.map((repo) => ({
-      _id: repo._id.toString(),
-      name: repo.name,
-      full_name: repo.full_name || `${repo.owner}/${repo.name}`, // Use full_name if available
-      description: repo.description || "",
-      owner: {
-        avatar_url: repo.owner?.avatar_url || "",
-        login: repo.owner?.login || repo.owner, // Use owner.login if available
-      },
-      stargazers_count: repo.stargazers_count || 0,
-      language: repo.language || "",
-      topics: repo.topics || [],
-      updated_at: repo.updated_at || new Date().toISOString(),
-      html_url:
-        repo.html_url || `https://github.com/${repo.owner}/${repo.name}`,
-    }));
-
-    res.status(200).json(formattedRepos);
+    res.status(200).json(repositories);
   } catch (error) {
     console.error("Error fetching stored repositories:", error);
     next(error);
@@ -51,30 +36,48 @@ export const getRepositoryById = async (req, res, next) => {
       return res.status(404).json({ error: "Repository not found" });
     }
 
-    // Format repository to match frontend Repository type
-    const formattedRepo = {
-      _id: repository._id.toString(),
-      name: repository.name,
-      full_name:
-        repository.full_name || `${repository.owner}/${repository.name}`, // Use full_name if available
-      description: repository.description || "",
-      owner: {
-        avatar_url: repository.owner?.avatar_url || "",
-        login: repository.owner?.login || repository.owner, // Use owner.login if available
-      },
-      stargazers_count: repository.stargazers_count || 0,
-      language: repository.language || "",
-      topics: repository.topics || [],
-      updated_at: repository.updated_at || new Date().toISOString(),
-      html_url:
-        repository.html_url ||
-        `https://github.com/${repository.owner}/${repository.name}`,
-      changelog: repository.changelog || [], // Include changelog data
-    };
-
-    res.status(200).json(formattedRepo);
+    res.status(200).json(repository);
   } catch (error) {
     console.error("Error fetching repository:", error);
+    next(error);
+  }
+};
+
+/**
+ * Adds a new repository to the database.
+ * If a repository with the same owner and name already exists, it will be updated.
+ * @param {Object} req - The request object.
+ * @param {Object} res - The response object.
+ * @param {Function} next - The next middleware function.
+ */
+export const addRepository = async (req, res, next) => {
+  try {
+    const { owner, name } = req.body;
+
+    // Try to find existing repository
+    const existingRepo = await Repository.findOne({ owner: owner, name: name });
+    
+    if (existingRepo) {
+      // Update existing repository
+      const updatedRepo = await Repository.findByIdAndUpdate(
+        existingRepo._id,
+        { 
+          $set: { 
+            ...req.body,
+            lastGeneratedAt: existingRepo.lastGeneratedAt // Preserve the last generated time
+          }
+        },
+        { new: true, runValidators: true }
+      );
+      res.json(updatedRepo);
+    } else {
+      // Create new repository
+      const repository = new Repository(req.body);
+      await repository.save();
+      res.json(repository);
+    }
+  } catch (error) {
+    console.error("Error adding repository:", error);
     next(error);
   }
 };

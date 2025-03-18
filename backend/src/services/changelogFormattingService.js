@@ -1,33 +1,6 @@
 import { sendChatPrompt } from "./openaiService.js";
 import { changelogSchema } from "../schemas/changelogSchema.js";
-
-/**
- * Cleans up the LLM response by removing markdown code blocks and any extra whitespace
- * @param {string} response - The raw response from the LLM
- * @returns {string} - The cleaned response
- */
-const cleanLLMResponse = (response) => {
-  // Remove markdown code blocks and any language specifiers
-  const withoutCodeBlocks = response.replace(/```(?:json)?\s*([\s\S]*?)\s*```/g, '$1');
-  // Trim any extra whitespace
-  const trimmed = withoutCodeBlocks.trim();
-  return trimmed;
-};
-
-/**
- * Safely parses JSON from a string
- * @param {string} str - The string to parse
- * @returns {Object} - The parsed JSON object
- */
-const safeJSONParse = (str) => {
-  try {
-    return JSON.parse(str);
-  } catch (error) {
-    console.error("Error parsing JSON:", error);
-    console.error("Problematic string:", str);
-    throw new Error("Failed to parse changelog JSON");
-  }
-};
+import { cleanLLMResponse, safeJSONParse } from "../utils/llmUtils.js";
 
 /**
  * Converts filtered API changes into a user-readable changelog format.
@@ -67,14 +40,9 @@ ${JSON.stringify(apiChanges, null, 2)}
   `;
 
   try {
-    const changelogStr = await sendChatPrompt(
-      prompt,
-      "gpt-4o-mini",
-      0.3,
-      changelogSchema
-    );
-
+    const changelogStr = await sendChatPrompt(prompt, "gpt-4o-mini", 0.3, changelogSchema);
     console.log("Raw LLM response:", changelogStr);
+    
     const cleanedResponse = cleanLLMResponse(changelogStr);
     console.log("Cleaned response:", cleanedResponse);
     
@@ -83,9 +51,7 @@ ${JSON.stringify(apiChanges, null, 2)}
     
     return parsedChangelog;
   } catch (error) {
-    console.error("Error generating readable changelog:");
-    console.error("Error message:", error.message);
-    console.error("Full error object:", error);
-    throw new Error("Failed to generate readable changelog using OpenAI");
+    console.error("Error generating readable changelog:", error);
+    throw error;
   }
 };

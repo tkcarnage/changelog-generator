@@ -104,6 +104,13 @@ GITHUB_TOKEN=your_github_token_here
 
 - add the summarized code diff with the commit to give the llm more context (variable names, purpose of the function, etc)
 
+5. Add cronjob to schedule automatically the generation of changelogs
+
+## AI USAGE:
+
+Copilot
+Windsurf
+
 ## Contributing
 
 1. Fork the repository

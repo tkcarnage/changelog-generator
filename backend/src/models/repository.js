@@ -3,34 +3,42 @@ import mongoose from "mongoose";
 const RepositorySchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
-    full_name: { type: String, required: true },
-    description: { type: String },
     owner: {
-      login: { type: String, required: true },
-      avatar_url: { type: String },
+      type: Object,
+      required: true,
     },
-    stargazers_count: { type: Number, default: 0 },
+    full_name: { type: String },
+    description: { type: String },
+    stargazers_count: { type: Number },
     language: { type: String },
     topics: [{ type: String }],
-    updated_at: { type: Date },
-    html_url: { type: String, required: true },
-    default_branch: { type: String, required: true },
+    updated_at: { type: String },
+    html_url: { type: String },
+    default_branch: { type: String },
+    lastGeneratedAt: { type: Date },
     license: {
       name: { type: String },
       url: { type: String },
     },
     changelog: [{
-      timestamp: { type: Date },
+      timestamp: { 
+        type: Date, 
+        required: true 
+      },
       sections: [{
-        type: { type: String },
+        type: { 
+          type: String,
+          enum: ['New Features', 'Bug Fixes', 'Breaking Changes', 'Documentation', 'Other'],
+          required: true
+        },
         changes: [{
           title: { type: String },
           description: { type: String },
-          prNumber: { type: Number, required: false },
-          prUrl: { type: String, required: false },
-          mergedAt: { type: Date, required: false },
-          files: [{ type: mongoose.Schema.Types.Mixed }],  // More flexible file structure
-          actionRequired: { type: String, required: false }
+          prNumber: { type: Number },
+          prUrl: { type: String },
+          mergedAt: { type: Date },
+          files: [{ type: String }],
+          actionRequired: { type: String }
         }]
       }],
       _id: false  // Disable automatic _id for subdocuments
@@ -41,5 +49,8 @@ const RepositorySchema = new mongoose.Schema(
     strict: false  // Allow fields not specified in the schema
   }
 );
+
+// Compound index to prevent duplicate repositories
+RepositorySchema.index({ 'owner': 1, 'name': 1 }, { unique: true });
 
 export default mongoose.model("Repository", RepositorySchema);

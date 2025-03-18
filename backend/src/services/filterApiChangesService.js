@@ -1,5 +1,6 @@
 import { sendChatPrompt } from "./openaiService.js";
 import { apiChangesSchema } from "../schemas/apiChangesSchema.js";
+import { cleanLLMResponse, safeJSONParse } from "../utils/llmUtils.js";
 
 /**
  * Filters API changes relevant to customers based on detailed commit data.
@@ -21,7 +22,6 @@ export const filterApiChanges = async (commitData) => {
       sha: c.sha,
       message: c.message,
       date: c.date,
-      // rawDiff: c.rawDiff,
       files: c.files.map((file) => ({
         filename: file.filename,
         status: file.status,
@@ -49,18 +49,13 @@ ${JSON.stringify(formattedCommits, null, 2)}
   `;
 
   try {
-    const apiChangesStr = await sendChatPrompt(
-      prompt,
-      "gpt-4o-mini",
-      0.3,
-      apiChangesSchema
-    );
-
+    const apiChangesStr = await sendChatPrompt(prompt, "gpt-4o-mini", 0.1, apiChangesSchema);
     console.log("raw apiChangesStr:", apiChangesStr);
-    const cleanedApiChangesStr = apiChangesStr.replace(/^```json\s*|```$/g, "");
-    return JSON.parse(cleanedApiChangesStr);
+    
+    const cleanedApiChangesStr = cleanLLMResponse(apiChangesStr);
+    return safeJSONParse(cleanedApiChangesStr);
   } catch (error) {
-    console.error("Error filtering API changes:", error.stack);
+    console.error("Error filtering API changes:", error);
     throw error;
   }
 };
