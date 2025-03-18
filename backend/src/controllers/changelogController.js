@@ -1,10 +1,10 @@
-import { Octokit } from '@octokit/rest';
+import { Octokit } from "@octokit/rest";
 import Repository from "../models/repository.js"; // Added this line
 import Commit from "../models/commit.js";
 import { filterApiChanges } from "../services/filterApiChangesService.js";
 import { generateReadableChangelog } from "../services/changelogFormattingService.js";
 import _ from "lodash";
-import dotenv from 'dotenv';
+import dotenv from "dotenv";
 
 // Load environment variables
 dotenv.config();
@@ -14,39 +14,74 @@ const clients = new Map();
 
 // Helper function to send progress updates
 const sendProgress = (clientId, data) => {
-  const client = clients.get(clientId);
-  if (client) {
+  try {
+    const client = clients.get(clientId);
+    if (!client) {
+      console.warn(`No client found for ID: ${clientId}`);
+      return;
+    }
+
+    // Validate progress data
     if (data.progress !== undefined) {
       data.progress = Math.min(Math.max(Math.round(data.progress), 0), 100);
     }
-    client.write(`data: ${JSON.stringify(data)}\n\n`);
+    if (!data.step) {
+      data.step = "Processing...";
+    }
+
+    // Try to send the progress update
+    const success = client.write(`data: ${JSON.stringify(data)}\n\n`);
+    if (!success) {
+      console.warn(`Failed to write to client: ${clientId}`);
+      clients.delete(clientId);
+    }
+  } catch (error) {
+    console.error(`Error sending progress to client ${clientId}:`, error);
+    clients.delete(clientId);
   }
 };
 
-// SSE endpoint for progress updates
+// SSE endpoint for receiving progress updates.
 export const changelogProgress = (req, res) => {
   const { owner, repo } = req.query;
   const clientId = `${owner}/${repo}`;
 
   // Return error if owner/repo not provided
   if (!owner || !repo) {
-    res.status(400).json({ error: 'Owner and repo parameters are required' });
+    res.status(400).json({ error: "Owner and repo parameters are required" });
     return;
   }
 
+  // Set up SSE headers
   res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no", // Disable proxy buffering
   });
 
+  // Ensure the connection stays alive
+  const keepAlive = setInterval(() => {
+    sendProgress(clientId, { progress: -1, step: "keepalive" });
+  }, 30000); // Send keepalive every 30 seconds
+
   // Send initial progress
-  sendProgress(clientId, { progress: 0, step: 'Initializing...' });
+  sendProgress(clientId, { progress: 0, step: "Initializing..." });
 
   // Store client connection
   clients.set(clientId, res);
 
-  req.on('close', () => {
+  // Clean up on client disconnect
+  req.on("close", () => {
+    clearInterval(keepAlive);
+    clients.delete(clientId);
+    console.log(`Client disconnected: ${clientId}`);
+  });
+
+  // Handle errors
+  req.on("error", (error) => {
+    console.error(`Error with client ${clientId}:`, error);
+    clearInterval(keepAlive);
     clients.delete(clientId);
   });
 };
@@ -57,12 +92,12 @@ const createOctokit = () => {
   if (!token) {
     throw new Error("GitHub token is not configured in environment variables");
   }
-  console.log('Creating Octokit instance with GitHub token from environment');
+  console.log("Creating Octokit instance with GitHub token from environment");
   return new Octokit({
     auth: token,
     headers: {
-      'X-GitHub-Api-Version': '2022-11-28'
-    }
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
   });
 };
 
@@ -76,7 +111,7 @@ const getRepositoryInfo = async (octokit, owner, repo) => {
 
   // Update repository in database with latest info
   await Repository.findOneAndUpdate(
-    { name: repo, 'owner.login': owner },
+    { name: repo, "owner.login": owner },
     {
       name: repoInfo.name,
       full_name: repoInfo.full_name,
@@ -91,17 +126,19 @@ const getRepositoryInfo = async (octokit, owner, repo) => {
       updated_at: repoInfo.updated_at,
       html_url: repoInfo.html_url,
       default_branch: repoInfo.default_branch,
-      license: repoInfo.license ? {
-        name: repoInfo.license.name,
-        url: repoInfo.license.url,
-      } : undefined,
+      license: repoInfo.license
+        ? {
+            name: repoInfo.license.name,
+            url: repoInfo.license.url,
+          }
+        : undefined,
     },
     { upsert: true, new: true }
   );
 
   return {
     defaultBranch: repoInfo.default_branch,
-    ...repoInfo
+    ...repoInfo,
   };
 };
 
@@ -109,11 +146,12 @@ const getRepositoryInfo = async (octokit, owner, repo) => {
 const getPRForCommit = async (octokit, owner, repo, commitSha) => {
   try {
     console.log(`Fetching PR info for commit: ${commitSha}`);
-    const { data: prs } = await octokit.repos.listPullRequestsAssociatedWithCommit({
-      owner,
-      repo,
-      commit_sha: commitSha,
-    });
+    const { data: prs } =
+      await octokit.repos.listPullRequestsAssociatedWithCommit({
+        owner,
+        repo,
+        commit_sha: commitSha,
+      });
 
     if (prs.length > 0) {
       const pr = prs[0]; // Get the first PR that contains this commit
@@ -122,9 +160,9 @@ const getPRForCommit = async (octokit, owner, repo, commitSha) => {
         title: pr.title,
         body: pr.body,
         mergedAt: pr.merged_at,
-        labels: pr.labels.map(label => label.name),
+        labels: pr.labels.map((label) => label.name),
         author: pr.user.login,
-        url: pr.html_url
+        url: pr.html_url,
       };
     }
     return null;
@@ -145,7 +183,7 @@ const getCommitDetails = async (octokit, owner, repo, sha) => {
     });
 
     return {
-      files: commitData.files.map(file => ({
+      files: commitData.files.map((file) => ({
         filename: file.filename,
         status: file.status,
         changes: file.changes,
@@ -153,7 +191,7 @@ const getCommitDetails = async (octokit, owner, repo, sha) => {
         deletions: file.deletions,
         // rawDiff: file.patch || ''
       })),
-      stats: commitData.stats
+      stats: commitData.stats,
     };
   } catch (error) {
     console.error(`Error fetching commit details for ${sha}:`, error);
@@ -162,58 +200,88 @@ const getCommitDetails = async (octokit, owner, repo, sha) => {
 };
 
 // Process commits in chunks for parallel processing
-const processCommitChunk = async (commits, repository, octokit, owner, repo, defaultBranch) => {
+const processCommitChunk = async (
+  commits,
+  repository,
+  octokit,
+  owner,
+  repo,
+  defaultBranch
+) => {
   try {
     console.log(`Processing chunk of ${commits.length} commits`);
-    const processedCommits = await Promise.all(commits.map(async (commit) => {
-      console.log(`Processing commit: ${commit.sha}`);
-      const [prInfo, commitDetails] = await Promise.all([
-        getPRForCommit(octokit, owner, repo, commit.sha),
-        getCommitDetails(octokit, owner, repo, commit.sha)
-      ]);
+    const processedCommits = await Promise.all(
+      commits.map(async (commit) => {
+        console.log(`Processing commit: ${commit.sha}`);
+        const [prInfo, commitDetails] = await Promise.all([
+          getPRForCommit(octokit, owner, repo, commit.sha),
+          getCommitDetails(octokit, owner, repo, commit.sha),
+        ]);
 
-      // Ensure all required fields are present
-      return {
-        branchName: defaultBranch,
-        prTitle: prInfo?.title || commit.commit.message.split('\n')[0],
-        prDescription: prInfo?.body || commit.commit.message,
-        prNumber: prInfo?.number || null,
-        prUrl: prInfo?.url || `https://github.com/${owner}/${repo}/commit/${commit.sha}`,
-        prLabels: prInfo?.labels || [],
-        prAuthor: prInfo?.author || commit.commit.author.name,
-        mergedAt: prInfo?.mergedAt || commit.commit.author.date,
-        commits: [{
+        const commitData = {
+          branchName: defaultBranch,
+          prTitle: prInfo?.title || commit.commit.message.split("\n")[0],
+          prDescription: prInfo?.body || commit.commit.message,
+          prNumber: prInfo?.number || null,
+          prUrl:
+            prInfo?.url ||
+            `https://github.com/${owner}/${repo}/commit/${commit.sha}`,
+          prLabels: prInfo?.labels || [],
+          prAuthor: prInfo?.author || commit.commit.author.name,
+          mergedAt: prInfo?.mergedAt || commit.commit.author.date,
+          commits: [
+            {
+              sha: commit.sha,
+              message: commit.commit.message,
+              date: commit.commit.author.date,
+              author: commit.commit.author.name,
+              files: commitDetails.files.map((file) => ({
+                filename: file.filename,
+                status: file.status,
+                changes: file.changes || 0,
+                additions: file.additions || 0,
+                deletions: file.deletions || 0,
+              })),
+              stats: commitDetails.stats,
+            },
+          ],
+        };
+
+        // Save commit record before filtering API changes
+        await Commit.create({
           sha: commit.sha,
           message: commit.commit.message,
-          date: commit.commit.author.date,
-          author: commit.commit.author.name,
-          files: commitDetails.files.map(file => ({
-            filename: file.filename,
-            status: file.status,
-            changes: file.changes || 0,
-            additions: file.additions || 0,
-            deletions: file.deletions || 0
-          })),
-          stats: commitDetails.stats
-        }]
-      };
-    }));
+          repository: repository._id,
+          branchName: defaultBranch,
+          commits: commitData.commits,
+        });
+
+        return commitData;
+      })
+    );
 
     // Filter and categorize API changes
-    console.log('Filtering and categorizing API changes');
+    console.log("Filtering and categorizing API changes");
     const apiChanges = await filterApiChanges(processedCommits);
-    console.log('API changes:', JSON.stringify(apiChanges, null, 2));
-    
+    console.log("API changes:", JSON.stringify(apiChanges, null, 2));
+
     return apiChanges;
   } catch (error) {
-    console.error('Error processing commit chunk:', error);
+    console.error("Error processing commit chunk:", error);
     throw error;
   }
 };
 
 export const getCommitAndGenerateChangeLog = async (req, res) => {
-  const { username: owner, repo, startDate, endDate } = req.body;
+  const { owner, repo, startDate, endDate } = req.body;
   const clientId = `${owner}/${repo}`;
+
+  // Ensure that the SSE connection is already established via changelogProgress
+  if (!clients.has(clientId)) {
+    return res.status(400).json({
+      error: "No active SSE connection. Please open the progress stream first.",
+    });
+  }
 
   if (!owner || !repo) {
     return res.status(400).json({ error: "Missing required parameters" });
@@ -221,21 +289,27 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
 
   // Set default dates if not provided
   const now = new Date();
-  const twoWeeksAgo = new Date(now.getTime() - (14 * 24 * 60 * 60 * 1000));
-  
+  const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
   const effectiveStartDate = startDate ? new Date(startDate) : twoWeeksAgo;
   const effectiveEndDate = endDate ? new Date(endDate) : now;
 
   try {
     // Initial progress
-    sendProgress(clientId, { progress: 10, step: 'Starting changelog generation...' });
+    sendProgress(clientId, {
+      progress: 10,
+      step: "Starting changelog generation...",
+    });
 
     const octokit = createOctokit();
 
-    sendProgress(clientId, { progress: 20, step: 'Fetching repository information...' });
+    sendProgress(clientId, {
+      progress: 20,
+      step: "Fetching repository information...",
+    });
     const repoInfo = await getRepositoryInfo(octokit, owner, repo);
-    
-    sendProgress(clientId, { progress: 30, step: 'Fetching commits...' });
+
+    sendProgress(clientId, { progress: 30, step: "Fetching commits..." });
 
     // Fetch commits between dates
     const { data: commits } = await octokit.repos.listCommits({
@@ -258,44 +332,52 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
           avatar_url: repoInfo.owner.avatar_url,
         },
         html_url: repoInfo.html_url,
-        default_branch: repoInfo.default_branch
+        default_branch: repoInfo.default_branch,
       },
       { upsert: true, new: true }
     );
 
     // Process commits in parallel chunks
-    const CHUNK_SIZE = 10; 
+    const CHUNK_SIZE = 10;
     const commitChunks = _.chunk(commits, CHUNK_SIZE);
     const totalChunks = commitChunks.length;
-    
+
     // Allocate progress ranges for different stages
     const COMMIT_PROCESSING_START = 30;
     const COMMIT_PROCESSING_END = 80;
-    const progressPerChunk = (COMMIT_PROCESSING_END - COMMIT_PROCESSING_START) / totalChunks;
+    const progressPerChunk =
+      (COMMIT_PROCESSING_END - COMMIT_PROCESSING_START) / totalChunks;
 
     let allApiChanges = {};
     let currentChangelog = null;
 
     // Process chunks in parallel with batching
-    const PARALLEL_BATCH_SIZE = 3; 
+    const PARALLEL_BATCH_SIZE = 3;
     for (let i = 0; i < commitChunks.length; i += PARALLEL_BATCH_SIZE) {
       const currentBatch = commitChunks.slice(i, i + PARALLEL_BATCH_SIZE);
-      const currentProgress = COMMIT_PROCESSING_START + (progressPerChunk * i);
-      
-      sendProgress(clientId, { 
+      const currentProgress = COMMIT_PROCESSING_START + progressPerChunk * i;
+
+      sendProgress(clientId, {
         progress: currentProgress,
-        step: `Processing commits (${Math.min(i + PARALLEL_BATCH_SIZE, commitChunks.length)}/${commitChunks.length})...` 
+        step: `Processing commits (${Math.min(i + PARALLEL_BATCH_SIZE, commitChunks.length)}/${commitChunks.length})...`,
       });
 
       // Process each chunk in the batch in parallel
       const batchResults = await Promise.all(
-        currentBatch.map(chunk => 
-          processCommitChunk(chunk, repository, octokit, owner, repo, repoInfo.default_branch)
+        currentBatch.map((chunk) =>
+          processCommitChunk(
+            chunk,
+            repository,
+            octokit,
+            owner,
+            repo,
+            repoInfo.default_branch
+          )
         )
       );
 
       // Merge results from all chunks in this batch
-      batchResults.forEach(apiChanges => {
+      batchResults.forEach((apiChanges) => {
         Object.entries(apiChanges).forEach(([key, value]) => {
           if (!allApiChanges[key]) allApiChanges[key] = [];
           allApiChanges[key].push(...value);
@@ -303,15 +385,16 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
       });
 
       // Generate and save intermediate changelog after each batch
-      const intermediateChangelog = await generateReadableChangelog(allApiChanges);
+      const intermediateChangelog =
+        await generateReadableChangelog(allApiChanges);
       currentChangelog = {
         ...intermediateChangelog,
         repository: {
           owner: owner,
           name: repo,
-          full_name: `${owner}/${repo}`
+          full_name: `${owner}/${repo}`,
         },
-        timestamp: new Date()
+        timestamp: new Date(),
       };
 
       // Update repository with new changelog entry
@@ -319,25 +402,24 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
         repository._id,
         {
           $set: {
-            'changelog': [{
-              timestamp: new Date(),
-              sections: currentChangelog.sections
-            }]
-          }
+            changelog: [
+              {
+                timestamp: new Date(),
+                sections: currentChangelog.sections,
+              },
+            ],
+          },
         },
         { runValidators: true }
       );
     }
 
-    sendProgress(clientId, { progress: 90, step: 'Finalizing changelog...' });
+    sendProgress(clientId, { progress: 90, step: "Finalizing changelog..." });
 
     // Send final progress update
-    sendProgress(clientId, { progress: 100, step: 'Complete' });
-
-    // Return the actual changelog data in the response
-    res.json(currentChangelog);
+    sendProgress(clientId, { progress: 100, step: "Complete" });
   } catch (error) {
-    console.error('Error generating changelog:', error);
+    console.error("Error generating changelog:", error);
     sendProgress(clientId, { error: error.message });
     res.status(500).json({ error: error.message });
   } finally {

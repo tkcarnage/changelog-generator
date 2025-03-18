@@ -1,8 +1,10 @@
 import express from "express";
 import { home } from "../controllers/homeController.js";
-import { getCommitAndGenerateChangeLog, changelogProgress } from "../controllers/changelogController.js";
 import {
-  getRepositoriesByUsername,
+  getCommitAndGenerateChangeLog,
+  changelogProgress,
+} from "../controllers/changelogController.js";
+import {
   getStoredRepositories,
   getRepositoryById,
 } from "../controllers/repositoryController.js";
@@ -19,6 +21,5 @@ router.get("/generate-changelog/progress", changelogProgress);
 // Repository endpoints
 router.get("/repositories", getStoredRepositories);
 router.get("/repositories/:id", getRepositoryById);
-router.get("/github-repositories/:username", getRepositoriesByUsername);
 
 export default router;

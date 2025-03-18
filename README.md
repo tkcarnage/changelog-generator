@@ -92,6 +92,18 @@ OPENAI_API_KEY=your_openai_api_key_here
 GITHUB_TOKEN=your_github_token_here
 ```
 
+## TODO:
+
+1. Create retry method incase llm calls fail (saved commits for this reason)
+2. Chunk dynamically, instead of set size, with tokenizer, to speed up generation latency.
+3. Allow users to edit the changelog depending if they are owner?
+
+- need to add auth to add this feature
+
+4. Create another llm prompt with a model thats good at recognizing code diffs.
+
+- add the summarized code diff with the commit to give the llm more context (variable names, purpose of the function, etc)
+
 ## Contributing
 
 1. Fork the repository

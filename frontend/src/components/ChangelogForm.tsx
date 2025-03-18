@@ -112,9 +112,17 @@ export default function ChangelogForm({ onGenerateStart, onGenerateComplete, mut
       toast.error('Please enter a GitHub repository URL')
       return
     }
-
     if (!date?.from) {
       toast.error('Please select a start date')
+      return
+    }
+    if (!date?.to) {
+      toast.error('Please select an end date')
+      return
+    }
+    // Validate that the end date is not before the start date
+    if (date.to < date.from) {
+      toast.error('End date cannot be before start date')
       return
     }
 
@@ -135,7 +143,7 @@ export default function ChangelogForm({ onGenerateStart, onGenerateComplete, mut
         owner: urlOwner,
         repo: urlRepo,
         startDate: format(date.from, 'yyyy-MM-dd'),
-        endDate: format(new Date(), 'yyyy-MM-dd'),
+        endDate: format(date.to, 'yyyy-MM-dd'),
       })
 
       await onGenerateComplete()
@@ -197,14 +205,55 @@ export default function ChangelogForm({ onGenerateStart, onGenerateComplete, mut
               selected={date?.from}
               onSelect={(selectedDate) => {
                 if (selectedDate) {
-                  setDate({
-                    from: selectedDate,
-                    to: new Date()
-                  })
+                  setDate(prev => ({ ...prev, from: selectedDate }))
                 }
               }}
               numberOfMonths={1}
               disabled={mutation.isPending}
+              toDate={new Date()}
+            />
+          </PopoverContent>
+        </Popover>
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-slate-200">
+          Select End Date
+        </label>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className={cn(
+                "w-full justify-start text-left font-normal",
+                !date && "text-muted-foreground"
+              )}
+              disabled={mutation.isPending}
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {date?.to ? (
+                <>
+                  Until {format(date.to, "LLL dd, y")}
+                </>
+              ) : (
+                <span>Pick an end date</span>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              initialFocus
+              mode="single"
+              defaultMonth={date?.to}
+              selected={date?.to}
+              onSelect={(selectedDate) => {
+                if (selectedDate) {
+                  setDate(prev => ({ ...prev, to: selectedDate }))
+                }
+              }}
+              numberOfMonths={1}
+              disabled={mutation.isPending}
+              fromDate={date.from}
               toDate={new Date()}
             />
           </PopoverContent>

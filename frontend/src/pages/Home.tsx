@@ -22,7 +22,7 @@ const generateChangelog = async (params: GenerateChangelogParams) => {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      username: params.owner,
+      owner: params.owner,
       repo: params.repo,
       startDate: params.startDate,
       endDate: params.endDate,
@@ -71,6 +71,7 @@ export default function Home() {
     try {
       await refetch()
     } catch (error) {
+      console.error('error:', error)
       toast.error('Failed to refresh repository list')
     }
   }
