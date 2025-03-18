@@ -4,15 +4,18 @@ const RepositorySchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
     owner: {
-      type: Object,
-      required: true,
+      login: { type: String, required: true },
+      avatar_url: { type: String },
+      html_url: { type: String },
+      type: { type: String }
     },
     full_name: { type: String },
     description: { type: String },
-    stargazers_count: { type: Number },
+    stargazers_count: { type: Number, default: 0 },
     language: { type: String },
     topics: [{ type: String }],
-    updated_at: { type: String },
+    created_at: { type: Date },
+    updated_at: { type: Date },
     html_url: { type: String },
     default_branch: { type: String },
     lastGeneratedAt: { type: Date },
@@ -45,12 +48,11 @@ const RepositorySchema = new mongoose.Schema(
     }],
   },
   { 
-    timestamps: true,
-    strict: false  // Allow fields not specified in the schema
+    timestamps: true
   }
 );
 
 // Compound index to prevent duplicate repositories
-RepositorySchema.index({ 'owner': 1, 'name': 1 }, { unique: true });
+RepositorySchema.index({ 'owner.login': 1, 'name': 1 }, { unique: true });
 
 export default mongoose.model("Repository", RepositorySchema);

@@ -20,7 +20,28 @@ export const apiChangesSchema = {
                 sha: { type: "string" },
                 message: { type: "string" },
                 date: { type: "string", format: "date-time" },
-                rawDiff: { type: "string" },
+                diffAnalysis: {
+                  type: "object",
+                  properties: {
+                    technicalChanges: { type: "string" },
+                    potentialImpact: { type: "string" },
+                    breakingChange: { type: "boolean" },
+                    affectedComponents: {
+                      type: "array",
+                      items: { type: "string" }
+                    },
+                    suggestedChangelogEntry: { type: "string" },
+                    metadata: {
+                      type: "object",
+                      properties: {
+                        filesAnalyzed: { type: "number" },
+                        diffSize: { type: "number" }
+                      },
+                      required: ["filesAnalyzed", "diffSize"]
+                    }
+                  },
+                  required: ["technicalChanges", "potentialImpact", "breakingChange", "affectedComponents", "suggestedChangelogEntry", "metadata"]
+                },
                 files: {
                   type: "array",
                   items: {
@@ -34,7 +55,7 @@ export const apiChangesSchema = {
                   },
                 },
               },
-              required: ["sha", "message", "date", "rawDiff", "files"],
+              required: ["sha", "message", "date", "diffAnalysis", "files"],
             },
           },
         },

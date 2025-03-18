@@ -14,19 +14,17 @@ export const filterApiChanges = async (commitData) => {
 
   // Prepare a simplified version of commit data
   const formattedCommits = commitData.map((commit) => ({
+    sha: commit.sha,
+    message: commit.message,
+    date: commit.date,
     branchName: commit.branchName,
     prTitle: commit.prTitle,
     prDescription: commit.prDescription,
     mergedAt: commit.mergedAt,
-    commits: commit.commits.map((c) => ({
-      sha: c.sha,
-      message: c.message,
-      date: c.date,
-      files: c.files.map((file) => ({
-        filename: file.filename,
-        status: file.status,
-        changes: file.changes,
-      })),
+    files: (commit.files || []).map((file) => ({
+      filename: file.filename,
+      status: file.status,
+      changes: file.changes,
     })),
   }));
 
@@ -53,7 +51,12 @@ ${JSON.stringify(formattedCommits, null, 2)}
     console.log("raw apiChangesStr:", apiChangesStr);
     
     const cleanedApiChangesStr = cleanLLMResponse(apiChangesStr);
-    return safeJSONParse(cleanedApiChangesStr);
+    const result = safeJSONParse(cleanedApiChangesStr);
+    
+    // Ensure we return the expected structure
+    return {
+      apiChanges: result.apiChanges || []
+    };
   } catch (error) {
     console.error("Error filtering API changes:", error);
     throw error;
