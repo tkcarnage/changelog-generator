@@ -122,9 +122,7 @@ export default function RepoDetail() {
                           )}
                         </div>
                         <p className="text-slate-300 mb-4">{change.description}</p>
-                        {change.actionRequired && 
-                         change.actionRequired.length > 0 && 
-                         !(change.actionRequired.length === 1 && change.actionRequired[0].description === 'No action required') && (
+                        {change.actionRequired && change.actionRequired !== 'No action required.' && (
                           <Accordion type="single" collapsible>
                             <AccordionItem value="action-required">
                               <AccordionTrigger className="text-sm font-medium text-yellow-500">
@@ -132,33 +130,7 @@ export default function RepoDetail() {
                               </AccordionTrigger>
                               <AccordionContent>
                                 <div className="space-y-3 pt-2">
-                                  {change.actionRequired.map((step, stepIdx) => (
-                                    <div key={`step-${stepIdx}`} className="text-sm">
-                                      <p className="text-slate-300">{step.description}</p>
-                                      {step.code && (
-                                        <pre className="mt-2 p-2 bg-gray-800 rounded text-xs overflow-x-auto">
-                                          <code className={step.codeLanguage ? `language-${step.codeLanguage}` : ''}>
-                                            {step.code}
-                                          </code>
-                                        </pre>
-                                      )}
-                                      {step.link && (
-                                        <a
-                                          href={step.link.url}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="text-xs text-blue-400 hover:text-blue-300 mt-1 block"
-                                        >
-                                          {step.link.text}
-                                        </a>
-                                      )}
-                                      {step.deadline && (
-                                        <p className="text-xs text-red-400 mt-1">
-                                          Deadline: {step.deadline}
-                                        </p>
-                                      )}
-                                    </div>
-                                  ))}
+                                  <p className="text-sm text-slate-300">{change.actionRequired}</p>
                                 </div>
                               </AccordionContent>
                             </AccordionItem>

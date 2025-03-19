@@ -23,12 +23,12 @@ interface ChangelogSection {
   changes: {
     title: string
     description: string
+    actionRequired: string
     commits?: string[]
   }[]
 }
 
 interface ChangelogData {
-  summary: string
   sections: ChangelogSection[]
 }
 

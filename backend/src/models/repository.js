@@ -1,19 +1,5 @@
 import mongoose from "mongoose";
 
-const ActionStepSchema = new mongoose.Schema(
-  {
-    description: { type: String, required: true },
-    code: { type: String },
-    codeLanguage: { type: String },
-    link: {
-      url: { type: String },
-      text: { type: String },
-    },
-    deadline: { type: String },
-  },
-  { _id: false }
-);
-
 const RepositorySchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
@@ -52,7 +38,7 @@ const RepositorySchema = new mongoose.Schema(
             {
               title: { type: String, required: true },
               description: { type: String, required: true },
-              actionRequired: [ActionStepSchema],
+              actionRequired: { type: String },
               mergedAt: { type: Date },
               prNumber: { type: Number },
               prUrl: { type: String },

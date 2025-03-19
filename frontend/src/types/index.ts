@@ -24,17 +24,6 @@ export interface Repository {
   }
 }
 
-export interface ActionStep {
-  description: string
-  code?: string
-  codeLanguage?: string
-  link?: {
-    url: string
-    text: string
-  }
-  deadline?: string
-}
-
 export interface Change {
   title: string
   description: string
@@ -42,7 +31,7 @@ export interface Change {
   prUrl?: string
   mergedAt?: Date
   files?: string[]
-  actionRequired?: ActionStep[]
+  actionRequired?: string
 }
 
 export interface Section {

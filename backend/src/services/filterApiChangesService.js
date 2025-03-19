@@ -60,10 +60,8 @@ ${JSON.stringify(formattedCommits, null, 2)}
     const cleanedApiChangesStr = cleanLLMResponse(apiChangesStr);
     const parsed = safeJSONParse(cleanedApiChangesStr);
 
-    // Ensure we return the correct structure
-    return {
-      changes: parsed.apiChanges || [],
-    };
+    // Return the parsed response directly since it now matches our expected structure
+    return parsed;
   } catch (error) {
     console.error("Error filtering API changes:", error);
     throw error;

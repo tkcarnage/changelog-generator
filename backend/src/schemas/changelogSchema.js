@@ -25,27 +25,7 @@ export const changelogSchema = {
               properties: {
                 title: { type: "string" },
                 description: { type: "string" },
-                actionRequired: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      description: { type: "string" },
-                      code: { type: "string" },
-                      codeLanguage: { type: "string" },
-                      link: {
-                        type: "object",
-                        properties: {
-                          url: { type: "string" },
-                          text: { type: "string" },
-                        },
-                        required: ["url", "text"],
-                      },
-                      deadline: { type: "string" },
-                    },
-                    required: ["description"],
-                  },
-                },
+                actionRequired: { type: "string" },
                 mergedAt: { type: "string", format: "date-time" },
                 files: {
                   type: "array",

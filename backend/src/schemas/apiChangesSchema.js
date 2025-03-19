@@ -1,7 +1,7 @@
 export const apiChangesSchema = {
   type: "object",
   properties: {
-    apiChanges: {
+    changes: {
       type: "array",
       items: {
         type: "object",
@@ -50,6 +50,6 @@ export const apiChangesSchema = {
       },
     },
   },
-  required: ["apiChanges"],
+  required: ["actionRequired", "changes"],
   additionalProperties: false,
 };
