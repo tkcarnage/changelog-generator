@@ -45,18 +45,16 @@ const processCommitChunk = async (
       );
 
       return {
-        sha: commit.sha,
-        message: commit.commit.message,
-        date: commit.commit.author.date,
+        sha: prInfo?.merge_commit_sha || commit?.sha, // Use PR's merge commit SHA if available
         branchName: defaultBranch,
         prTitle: prInfo?.title || "",
         prDescription: prInfo?.body || "",
-        mergedAt: prInfo?.mergedAt || commit.commit.author.date,
+        mergedAt: prInfo?.mergedAt || commit?.commit?.author?.date,
         commits: [
           {
-            sha: commit.sha,
-            message: commit.commit.message,
-            date: commit.commit.author.date,
+            sha: commit?.sha,  // This is the individual commit SHA
+            message: commit?.commit?.message,
+            date: commit?.commit?.author?.date,
             files: commitDetails.files,
           },
         ],
@@ -150,8 +148,7 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
             const mergedAt = new Date(prInfo.mergedAt);
             if (mergedAt >= since && mergedAt <= until) {
               return {
-                sha: commit.sha,
-                message: commit.commit.message,
+                sha: prInfo?.merge_commit_sha || commit.sha, // Use PR's merge commit SHA if available
                 repository: repository._id,
                 branchName: repoInfo.default_branch,
                 prTitle: prInfo.title,
@@ -161,7 +158,7 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
                 author: prInfo.author,
                 commits: [
                   {
-                    sha: commit.sha,
+                    sha: commit.sha,  // This is the individual commit SHA
                     message: commit.commit.message,
                     date: commit.commit.author.date,
                     files: commitDetails.files,
@@ -232,28 +229,40 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
     const apiChangeChunks = _.chunk(processedCommits, chunkllmSize);
     let allApiChanges = { changes: [] };
 
-    console.log(`Processing ${apiChangeChunks.length} chunks of size ${chunkllmSize}`);
+    console.log(
+      `Processing ${apiChangeChunks.length} chunks of size ${chunkllmSize}`
+    );
 
     // Process all chunks in parallel
     const chunkPromises = apiChangeChunks.map(async (chunk, index) => {
       try {
-        console.log(`\nProcessing chunk ${index + 1}/${apiChangeChunks.length}`);
-        console.log('Chunk commits:', chunk.map(c => ({ 
-          sha: c.sha.substring(0, 7), 
-          message: c.message.split('\n')[0],
-          date: c.date
-        })));
-        
+        console.log(
+          `\nProcessing chunk ${index + 1}/${apiChangeChunks.length}`
+        );
+        console.log(
+          "Chunk commits:",
+          chunk.map((c) => ({
+            sha: (c.sha || "").substring(0, 7),
+            message: (c.commits?.[0]?.message || "").split("\n")[0],
+            prTitle: c.prTitle || 'no title',
+            mergedAt: c.mergedAt || 'unknown'
+          }))
+        );
+
         const chunkChanges = await filterApiChanges(chunk);
-        console.log(`Filtered changes from chunk ${index + 1}:`, 
-          chunkChanges?.changes?.map(c => ({
+        console.log(
+          `Filtered changes from chunk ${index + 1}:`,
+          chunkChanges?.changes?.map((c) => ({
             title: c.prTitle,
-            mergedAt: c.mergedAt
+            mergedAt: c.mergedAt,
           })) || []
         );
         return chunkChanges?.changes || [];
       } catch (error) {
-        console.error(`Error processing API changes chunk ${index + 1}:`, error);
+        console.error(
+          `Error processing API changes chunk ${index + 1}:`,
+          error
+        );
         return [];
       }
     });
@@ -263,11 +272,12 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
 
     // Combine all changes
     allApiChanges.changes = allChanges.flat();
-    
-    console.log('\nAll changes before sorting:', 
-      allApiChanges.changes.map(c => ({
+
+    console.log(
+      "\nAll changes before sorting:",
+      allApiChanges.changes.map((c) => ({
         title: c.prTitle,
-        mergedAt: c.mergedAt
+        mergedAt: c.mergedAt,
       }))
     );
 
@@ -277,11 +287,12 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
       const dateB = new Date(b.mergedAt || 0);
       return dateB - dateA; // newest first
     });
-    
-    console.log('\nChanges after sorting:', 
-      allApiChanges.changes.map(c => ({
+
+    console.log(
+      "\nChanges after sorting:",
+      allApiChanges.changes.map((c) => ({
         title: c.prTitle,
-        mergedAt: c.mergedAt
+        mergedAt: c.mergedAt,
       }))
     );
 

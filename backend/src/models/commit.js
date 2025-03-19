@@ -3,13 +3,9 @@ import mongoose from "mongoose";
 const CommitSchema = new mongoose.Schema(
   {
     sha: {
-      type: String,
+      type: String,  // This will store the PR's merge commit SHA
       required: true,
       unique: true,
-    },
-    message: {
-      type: String,
-      required: true,
     },
     repository: {
       type: mongoose.Schema.Types.ObjectId,
@@ -17,13 +13,16 @@ const CommitSchema = new mongoose.Schema(
       required: true,
     },
     branchName: { type: String, required: true },
+    prTitle: { type: String },
+    prDescription: { type: String },
+    prNumber: { type: Number },
+    mergedAt: { type: Date },
+    author: { type: String },
     commits: [
       {
-        sha: { type: String, required: true },
+        sha: { type: String, required: true },  // Individual commit SHA
         message: { type: String, required: true },
-        author: { type: String },
         date: { type: Date, required: true },
-        // rawDiff: { type: String },
         files: [
           {
             filename: { type: String },

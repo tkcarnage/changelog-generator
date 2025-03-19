@@ -66,6 +66,7 @@ export const getPRForCommit = async (octokit, owner, repo, commitSha) => {
         title: pr.title,
         body: pr.body,
         mergedAt: pr.merged_at,
+        merge_commit_sha: pr.merge_commit_sha,
         labels: pr.labels.map((label) => label.name),
         author: pr.user.login,
         url: pr.html_url,
