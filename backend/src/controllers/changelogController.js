@@ -52,7 +52,7 @@ const processCommitChunk = async (
         mergedAt: prInfo?.mergedAt || commit?.commit?.author?.date,
         commits: [
           {
-            sha: commit?.sha,  // This is the individual commit SHA
+            sha: commit?.sha, // This is the individual commit SHA
             message: commit?.commit?.message,
             date: commit?.commit?.author?.date,
             files: commitDetails.files,
@@ -158,7 +158,7 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
                 author: prInfo.author,
                 commits: [
                   {
-                    sha: commit.sha,  // This is the individual commit SHA
+                    sha: commit.sha, // This is the individual commit SHA
                     message: commit.commit.message,
                     date: commit.commit.author.date,
                     files: commitDetails.files,
@@ -225,12 +225,12 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
     });
 
     // Process API changes in chunks in parallel
-    const chunkllmSize = 10;
-    const apiChangeChunks = _.chunk(processedCommits, chunkllmSize);
+    const chunkFilterSize = 10;
+    const apiChangeChunks = _.chunk(processedCommits, chunkFilterSize);
     let allApiChanges = { changes: [] };
 
     console.log(
-      `Processing ${apiChangeChunks.length} chunks of size ${chunkllmSize}`
+      `Processing ${apiChangeChunks.length} chunks of size ${chunkFilterSize}`
     );
 
     // Process all chunks in parallel
@@ -244,8 +244,8 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
           chunk.map((c) => ({
             sha: (c.sha || "").substring(0, 7),
             message: (c.commits?.[0]?.message || "").split("\n")[0],
-            prTitle: c.prTitle || 'no title',
-            mergedAt: c.mergedAt || 'unknown'
+            prTitle: c.prTitle || "no title",
+            mergedAt: c.mergedAt || "unknown",
           }))
         );
 
@@ -301,8 +301,52 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
       step: "Generating changelog...",
     });
 
-    // Generate the final changelog
-    const changelog = await generateReadableChangelog(allApiChanges);
+    // Process changelog in chunks to avoid token limits
+    const chunkChangelogSize = 10;
+    const changelogChunks = _.chunk(allApiChanges.changes, chunkChangelogSize);
+    const changelogSections = {
+      "New Features": [],
+      "Bug Fixes": [],
+      "Breaking Changes": [],
+      Documentation: [],
+      Other: [],
+    };
+
+    // Process each chunk in parallel
+    const changelogPromises = changelogChunks.map(async (chunk, index) => {
+      try {
+        console.log(
+          `\nProcessing changelog chunk ${index + 1}/${changelogChunks.length}`
+        );
+        const chunkChangelog = await generateReadableChangelog({
+          changes: chunk,
+        });
+        return chunkChangelog.sections;
+      } catch (error) {
+        console.error(`Error processing changelog chunk ${index + 1}:`, error);
+        return [];
+      }
+    });
+
+    // Wait for all changelog chunks
+    const allChangelogSections = await Promise.all(changelogPromises);
+
+    // Merge all sections
+    allChangelogSections.forEach((sections) => {
+      sections.forEach((section) => {
+        changelogSections[section.type].push(...section.changes);
+      });
+    });
+
+    // Create final changelog structure
+    const changelog = {
+      sections: Object.entries(changelogSections).map(([type, changes]) => ({
+        type,
+        changes: changes.sort(
+          (a, b) => new Date(b.mergedAt || 0) - new Date(a.mergedAt || 0)
+        ),
+      })),
+    };
 
     sendProgress(clientId, {
       progress: 100,
