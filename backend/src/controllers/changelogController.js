@@ -115,76 +115,85 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
       { new: true, upsert: true }
     );
 
-    // Get commits within date range
-    const since =
-      startDate ||
-      new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
-    const until = endDate || new Date().toISOString();
+    // Get all commits and process them in parallel
+    const since = startDate
+      ? new Date(startDate)
+      : new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+    const until = endDate ? new Date(endDate) : new Date();
 
     let allCommits = [];
     let page = 1;
     const per_page = 100; // Maximum allowed by GitHub API
+    const MAX_PAGES = 1; // Limit to 100 most recent commits
 
-    while (true) {
+    while (page <= MAX_PAGES) {
       const { data: commits } = await octokit.repos.listCommits({
         owner,
         repo,
-        since,
-        until,
         per_page,
         page,
       });
 
-      allCommits.push(...commits);
+      // Process commits in parallel and filter by date range
+      const processedCommits = await Promise.all(
+        commits.map(async (commit) => {
+          const prInfo = await getPRForCommit(octokit, owner, repo, commit.sha);
+          const commitDetails = await getCommitDetails(
+            octokit,
+            owner,
+            repo,
+            commit.sha
+          );
 
-      // If we got less than per_page items, we've reached the end
-      if (commits.length < per_page) {
+          // Only include commits with PRs within date range
+          if (prInfo?.mergedAt) {
+            const mergedAt = new Date(prInfo.mergedAt);
+            if (mergedAt >= since && mergedAt <= until) {
+              return {
+                sha: commit.sha,
+                message: commit.commit.message,
+                repository: repository._id,
+                branchName: repoInfo.default_branch,
+                prTitle: prInfo.title,
+                prDescription: prInfo.body,
+                prNumber: prInfo.number,
+                mergedAt: prInfo.mergedAt,
+                author: prInfo.author,
+                commits: [
+                  {
+                    sha: commit.sha,
+                    message: commit.commit.message,
+                    date: commit.commit.author.date,
+                    files: commitDetails.files,
+                  },
+                ],
+              };
+            }
+          }
+          return null;
+        })
+      );
+
+      // Filter out null values and add to allCommits
+      allCommits.push(...processedCommits.filter(Boolean));
+
+      // If we got less than per_page items or hit max pages, we're done
+      if (commits.length < per_page || page >= MAX_PAGES) {
         break;
       }
       page++;
     }
 
-    // Save all raw commits before processing
-    const commitSavePromises = allCommits.map(async (commit) => {
-      const prInfo = await getPRForCommit(octokit, owner, repo, commit.sha);
-      const commitDetails = await getCommitDetails(
-        octokit,
-        owner,
-        repo,
-        commit.sha
-      );
-
-      return Commit.findOneAndUpdate(
-        { sha: commit.sha },
-        {
-          $set: {
-            sha: commit.sha,
-            message: commit.commit.message,
-            repository: repository._id,
-            branchName: repoInfo.default_branch,
-            commits: [
-              {
-                sha: commit.sha,
-                message: commit.commit.message,
-                date: commit.commit.author.date,
-                files: commitDetails.files.map((f) => ({
-                  filename: f.filename,
-                  status: f.status,
-                  changes: f.changes,
-                })),
-              },
-            ],
-            prTitle: prInfo?.title || "",
-            prDescription: prInfo?.body || "",
-            mergedAt: prInfo?.mergedAt || commit.commit.author.date,
-          },
-        },
-        { new: true, upsert: true }
-      );
-    });
-
-    // Save commits in parallel
-    await Promise.all(commitSavePromises);
+    // Save all processed commits
+    await Promise.all(
+      allCommits.map((commit) =>
+        Commit.findOneAndUpdate(
+          { sha: commit.sha },
+          { $set: commit },
+          { new: true, upsert: true }
+        )
+      )
+    );
 
     // Process commits in chunks
     const chunkSize = 20;
