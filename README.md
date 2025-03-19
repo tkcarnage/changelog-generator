@@ -92,19 +92,87 @@ OPENAI_API_KEY=your_openai_api_key_here
 GITHUB_TOKEN=your_github_token_here
 ```
 
+## Technical & Product Decisions
+
+### 1. Developer-Facing Tool
+
+I built a powerful developer tool that prioritizes efficiency and ease of use:
+
+**Technical Choices:**
+- **Node.js/Express Backend**: Chosen for its robust ecosystem and excellent GitHub API libraries
+- **MongoDB**: Used for persistent storage of changelogs and efficient querying by date ranges
+- **OpenAI Integration**: Leverages AI for intelligent change categorization and summary generation
+- **Chunked Processing**: Handles large repositories efficiently by processing commits in manageable chunks
+- **Progress Tracking**: Real-time progress updates during changelog generation
+
+**Developer Experience:**
+- Simple setup with clear environment variables
+- Flexible date range selection for targeted changelogs
+- Automatic categorization of changes (New Features, Bug Fixes, Breaking Changes, etc.)
+- Progress indicators during generation
+- Error handling with saved commits for retry capability
+
+### 2. Public-Facing Website
+
+The public changelog website focuses on clarity and accessibility:
+
+**Technical Choices:**
+- **React Frontend**: Offers component reusability and efficient rendering
+- **Clean UI/UX**: Minimal, focused design that prioritizes readability
+- **Responsive Design**: Works well on all device sizes
+- **Fast Loading**: Optimized for quick access to changelog information
+
+**User Experience:**
+- Clear categorization of changes
+- Chronological organization
+- Accessible formatting
+
+### Why These Choices?
+
+1. **Separation of Concerns**
+   - Split into distinct services (GitHub interaction, AI processing, formatting)
+   - Makes the codebase maintainable and testable
+   - Allows for easy addition of new features
+
+2. **Scalability**
+   - Chunk-based processing handles repositories of any size
+   - MongoDB provides efficient storage and retrieval
+   - Parallel processing where appropriate
+
+3. **Developer Focus**
+   - Automated categorization reduces manual work
+   - Progress tracking keeps developers informed
+   - Flexible date ranges for targeted updates
+   - Preserved technical details for developer context
+
+4. **Future-Proofing**
+   - Modular architecture allows easy addition of new VCS providers
+   - Extensible formatting system for new output formats
+   - API design supports future frontend enhancements
+
 ## TODO:
 
 1. Create retry method incase llm calls fail (saved commits for this reason)
-2. Chunk dynamically, instead of set size, with tokenizer, to speed up generation latency.
+2. Chunk dynamically, instead of set size, with tokenizer or based on context, to speed up generation latency.
 3. Allow users to edit the changelog depending if they are owner?
-
-- need to add auth to add this feature
-
-4. Create another llm prompt with a model thats good at recognizing code diffs.
-
-- add the summarized code diff with the commit to give the llm more context (variable names, purpose of the function, etc)
-
+   - need to add auth to add this feature
+4. Create another llm prompt with a model thats good at recognizing code diffs
+   - add the summarized code diff with the commit to give the llm more context (variable names, purpose of the function, etc)
 5. Add cronjob to schedule automatically the generation of changelogs
+6. Add more export formats (PDF, HTML, JSON)
+7. Implement caching for better performance
+   - Cache GitHub API responses
+   - Cache LLM responses for similar commits
+8. Add support for more VCS providers
+   - GitLab integration
+   - Bitbucket integration
+9. Enhance breaking change detection
+   - Semantic versioning support
+   - API compatibility checking
+10. Add customization options for different project types
+    - Language-specific templates
+    - Custom categorization rules
+    - Project-specific filters
 
 ## AI USAGE:
 
