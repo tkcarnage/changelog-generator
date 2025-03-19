@@ -1,5 +1,19 @@
 import mongoose from "mongoose";
 
+const ActionStepSchema = new mongoose.Schema(
+  {
+    description: { type: String, required: true },
+    code: { type: String },
+    codeLanguage: { type: String },
+    link: {
+      url: { type: String },
+      text: { type: String },
+    },
+    deadline: { type: String },
+  },
+  { _id: false }
+);
+
 const RepositorySchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
@@ -19,41 +33,36 @@ const RepositorySchema = new mongoose.Schema(
       name: { type: String },
       url: { type: String },
     },
-    changelog: [
-      {
-        timestamp: {
-          type: Date,
-          required: true,
-        },
-        sections: [
-          {
-            type: {
-              type: String,
-              enum: [
-                "New Features",
-                "Bug Fixes",
-                "Breaking Changes",
-                "Documentation",
-                "Other",
-              ],
-              required: true,
-            },
-            changes: [
-              {
-                title: { type: String, required: true },
-                description: { type: String, required: true },
-                actionRequired: { type: String, required: true },
-                mergedAt: { type: Date },
-                prNumber: { type: Number },
-                prUrl: { type: String },
-                files: [{ type: String }],
-              },
+    changelog: {
+      lastUpdated: { type: Date, required: true },
+      sections: [
+        {
+          type: {
+            type: String,
+            enum: [
+              "New Features",
+              "Bug Fixes",
+              "Breaking Changes",
+              "Documentation",
+              "Other",
             ],
+            required: true,
           },
-        ],
-        _id: false, // Disable automatic _id for subdocuments
-      },
-    ],
+          changes: [
+            {
+              title: { type: String, required: true },
+              description: { type: String, required: true },
+              actionRequired: [ActionStepSchema],
+              mergedAt: { type: Date },
+              prNumber: { type: Number },
+              prUrl: { type: String },
+              files: [{ type: String }],
+            },
+          ],
+        },
+      ],
+      _id: false, // Disable automatic _id for subdocuments
+    },
     lastGeneratedAt: { type: Date },
   },
   {

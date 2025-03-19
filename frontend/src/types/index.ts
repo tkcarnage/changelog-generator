@@ -18,7 +18,21 @@ export interface Repository {
     name: string
     url: string
   }
-  changelog?: Changelog[]
+  changelog?: {
+    lastUpdated: Date
+    sections: Section[]
+  }
+}
+
+export interface ActionStep {
+  description: string
+  code?: string
+  codeLanguage?: string
+  link?: {
+    url: string
+    text: string
+  }
+  deadline?: string
 }
 
 export interface Change {
@@ -28,15 +42,10 @@ export interface Change {
   prUrl?: string
   mergedAt?: Date
   files?: string[]
-  actionRequired?: string
+  actionRequired?: ActionStep[]
 }
 
 export interface Section {
   type: 'New Features' | 'Bug Fixes' | 'Breaking Changes' | 'Documentation' | 'Other'
   changes: Change[]
-}
-
-export interface Changelog {
-  timestamp: Date
-  sections: Section[]
 }

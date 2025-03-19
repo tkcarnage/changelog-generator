@@ -89,70 +89,100 @@ export default function RepoDetail() {
         </div>
 
         <div className="space-y-6">
-          <h3 className="text-xl font-semibold">Changelogs</h3>
-          <div className="space-y-4">
-            {repo.changelog?.map((changelog, index) => (
-              <div key={index} className="bg-slate-800/50 rounded-lg p-6 space-y-6">
-                <div className="flex items-center justify-between">
-                  <span className="text-lg font-medium">
-                    Generated on {format(new Date(changelog.timestamp), 'MMM dd, yyyy HH:mm')}
-                  </span>
-                </div>
-                {changelog.sections.map((section, sectionIndex) => (
-                  <div key={sectionIndex} className="space-y-4">
-                    {section.changes?.length > 0 && (
-                      <h4 className={cn(
-                        "text-lg font-semibold px-4 py-2 rounded-md inline-block",
-                        section.type === 'Breaking Changes' ? "bg-red-900/50 text-red-200" :
-                        section.type === 'New Features' ? "bg-green-900/50 text-green-200" :
-                        "bg-blue-900/50 text-blue-200"
-                      )}>
-                        {section.type}
-                      </h4>
-                    )}
-                    <div className="space-y-4">
-                      {section.changes.map((change, changeIndex) => (
-                        <div key={changeIndex} className="bg-slate-800/30 rounded-lg p-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="text-lg font-medium">{change.title}</h4>
-                            {change.mergedAt && (
-                              <div className="flex items-center gap-2 text-sm text-slate-400">
-                                <Clock className="h-4 w-4" />
-                                <span>Merged {format(new Date(change.mergedAt), 'MMM dd, yyyy')}</span>
-                              </div>
-                            )}
-                          </div>
-                          <p className="text-slate-300 mb-4">{change.description}</p>
-                          {change.actionRequired && change.actionRequired !== 'No action required.' && (
-                            <Accordion type="single" collapsible>
-                              <AccordionItem value="action-required">
-                                <AccordionTrigger className="text-sm font-medium text-yellow-500">
-                                  Action Required
-                                </AccordionTrigger>
-                                <AccordionContent className="text-sm text-slate-300">
-                                  {change.actionRequired}
-                                </AccordionContent>
-                              </AccordionItem>
-                            </Accordion>
-                          )}
-                          {change.prUrl && (
-                            <a
-                              href={change.prUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="mt-4 inline-block text-sm text-blue-400 hover:text-blue-300"
-                            >
-                              View Pull Request #{change.prNumber}
-                            </a>
+          <h3 className="text-xl font-semibold">Changelog</h3>
+          {repo.changelog ? (
+            <div className="bg-slate-800/50 rounded-lg p-6 space-y-6">
+              <div className="flex items-center justify-between">
+                <span className="text-lg font-medium">
+                  Last updated {format(new Date(repo.changelog.lastUpdated), 'MMM dd, yyyy HH:mm')}
+                </span>
+              </div>
+              {repo.changelog.sections.map((section, sectionIndex) => (
+                <div key={sectionIndex} className="space-y-4">
+                  {section.changes?.length > 0 && (
+                    <h4 className={cn(
+                      "text-lg font-semibold px-4 py-2 rounded-md inline-block",
+                      section.type === 'Breaking Changes' ? "bg-red-900/50 text-red-200" :
+                      section.type === 'New Features' ? "bg-green-900/50 text-green-200" :
+                      "bg-blue-900/50 text-blue-200"
+                    )}>
+                      {section.type}
+                    </h4>
+                  )}
+                  <div className="space-y-4">
+                    {section.changes.map((change, changeIndex) => (
+                      <div key={changeIndex} className="bg-slate-800/30 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-lg font-medium">{change.title}</h4>
+                          {change.mergedAt && (
+                            <div className="flex items-center gap-2 text-sm text-slate-400">
+                              <Clock className="h-4 w-4" />
+                              <span>Merged {format(new Date(change.mergedAt), 'MMM dd, yyyy')}</span>
+                            </div>
                           )}
                         </div>
-                      ))}
-                    </div>
+                        <p className="text-slate-300 mb-4">{change.description}</p>
+                        {change.actionRequired && 
+                         change.actionRequired.length > 0 && 
+                         !(change.actionRequired.length === 1 && change.actionRequired[0].description === 'No action required') && (
+                          <Accordion type="single" collapsible>
+                            <AccordionItem value="action-required">
+                              <AccordionTrigger className="text-sm font-medium text-yellow-500">
+                                Action Required
+                              </AccordionTrigger>
+                              <AccordionContent>
+                                <div className="space-y-3 pt-2">
+                                  {change.actionRequired.map((step, stepIdx) => (
+                                    <div key={`step-${stepIdx}`} className="text-sm">
+                                      <p className="text-slate-300">{step.description}</p>
+                                      {step.code && (
+                                        <pre className="mt-2 p-2 bg-gray-800 rounded text-xs overflow-x-auto">
+                                          <code className={step.codeLanguage ? `language-${step.codeLanguage}` : ''}>
+                                            {step.code}
+                                          </code>
+                                        </pre>
+                                      )}
+                                      {step.link && (
+                                        <a
+                                          href={step.link.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-xs text-blue-400 hover:text-blue-300 mt-1 block"
+                                        >
+                                          {step.link.text}
+                                        </a>
+                                      )}
+                                      {step.deadline && (
+                                        <p className="text-xs text-red-400 mt-1">
+                                          Deadline: {step.deadline}
+                                        </p>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </AccordionContent>
+                            </AccordionItem>
+                          </Accordion>
+                        )}
+                        {change.prUrl && (
+                          <a
+                            href={change.prUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-4 inline-block text-sm text-blue-400 hover:text-blue-300"
+                          >
+                            View Pull Request #{change.prNumber}
+                          </a>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            ))}
-          </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-slate-400">No changelog available yet.</p>
+          )}
         </div>
       </div>
     </>

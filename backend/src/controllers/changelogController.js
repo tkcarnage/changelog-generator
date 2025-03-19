@@ -200,7 +200,7 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
       step: "Filtering API changes...",
     });
 
-    const apiChanges = await filterApiChanges(processedCommits);
+    const apiChanges = await filterApiChanges(processedCommits, { owner, repo });
 
     sendProgress(clientId, {
       progress: 90,
@@ -216,55 +216,30 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
       name: repo,
     });
 
-    // Get existing sections or create new ones
-    let sections;
-    if (existingRepo?.changelog?.[0]?.sections) {
-      sections = existingRepo.changelog[0].sections;
-      // Add new changes to existing sections
+    // Merge new changes with existing sections
+    let mergedSections = [];
+    if (existingRepo?.changelog?.sections) {
+      // Create a map of existing sections by type
+      const sectionMap = new Map(
+        existingRepo.changelog.sections.map((section) => [section.type, section])
+      );
+
+      // Merge new sections with existing ones
       changelog.sections.forEach((newSection) => {
-        const existingSection = sections.find(
-          (s) => s.type === newSection.type
-        );
-        if (existingSection && newSection.changes) {
-          existingSection.changes = [
-            ...existingSection.changes,
-            ...newSection.changes,
-          ];
+        const existingSection = sectionMap.get(newSection.type);
+        if (existingSection) {
+          // Merge changes into existing section
+          existingSection.changes = [...existingSection.changes, ...newSection.changes];
+          sectionMap.set(newSection.type, existingSection);
+        } else {
+          // Add new section
+          sectionMap.set(newSection.type, newSection);
         }
       });
+
+      mergedSections = Array.from(sectionMap.values());
     } else {
-      // Create new sections if none exist
-      sections = [
-        {
-          type: "New Features",
-          changes:
-            changelog.sections.find((s) => s.type === "New Features")
-              ?.changes || [],
-        },
-        {
-          type: "Bug Fixes",
-          changes:
-            changelog.sections.find((s) => s.type === "Bug Fixes")?.changes ||
-            [],
-        },
-        {
-          type: "Breaking Changes",
-          changes:
-            changelog.sections.find((s) => s.type === "Breaking Changes")
-              ?.changes || [],
-        },
-        {
-          type: "Documentation",
-          changes:
-            changelog.sections.find((s) => s.type === "Documentation")
-              ?.changes || [],
-        },
-        {
-          type: "Other",
-          changes:
-            changelog.sections.find((s) => s.type === "Other")?.changes || [],
-        },
-      ];
+      mergedSections = changelog.sections;
     }
 
     // Update repository in database
@@ -272,13 +247,11 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
       { "owner.login": owner, name: repo },
       {
         $set: {
-          changelog: [
-            {
-              timestamp: new Date(),
-              sections: sections,
-            },
-          ],
-          lastGeneratedAt: new Date()
+          changelog: {
+            lastUpdated: new Date(),
+            sections: mergedSections,
+          },
+          lastGeneratedAt: new Date(),
         },
       },
       { new: true, upsert: true }
@@ -291,7 +264,10 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
 
     res.json({
       success: true,
-      changelog,
+      changelog: {
+        lastUpdated: new Date(),
+        sections: mergedSections,
+      },
     });
   } catch (error) {
     console.error("Error generating changelog:", error);

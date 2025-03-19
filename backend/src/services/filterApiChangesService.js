@@ -3,13 +3,18 @@ import { apiChangesSchema } from "../schemas/apiChangesSchema.js";
 import { cleanLLMResponse, safeJSONParse } from "../utils/llmUtils.js";
 
 /**
- * Filters API changes relevant to customers based on detailed commit data.
+ * Filters customer-impacting changes relevant to customers based on detailed commit data.
  * @param {Array} commitData - The list of detailed commit data.
- * @returns {Promise<Object>} - The filtered API changes in a structured JSON format.
+ * @param {Object} repository - The repository information.
+ * @returns {Promise<Object>} - The filtered customer-impacting changes in a structured JSON format.
  */
-export const filterApiChanges = async (commitData) => {
+export const filterApiChanges = async (commitData, repository) => {
   if (!commitData || !Array.isArray(commitData)) {
     throw new Error("Invalid commit data format");
+  }
+
+  if (!repository || !repository.owner || !repository.repo) {
+    throw new Error("Invalid repository information");
   }
 
   // Prepare a simplified version of commit data
@@ -32,17 +37,22 @@ export const filterApiChanges = async (commitData) => {
 
   // Construct the prompt
   const prompt = `
-You are an AI assistant tasked with identifying **customer-facing API changes** from the provided commit data.
+You are an AI assistant tasked with identifying **customer-impacting changes** for the repository.
 Focus on commits that:
 1. Modify API endpoints, request/response formats, authentication, or error handling.
 2. Introduce breaking changes or deprecate existing functionality.
-3. Add new API routes, parameters, or features visible to customers.
+3. Add new features, parameters, or capabilities visible to customers.
+4. Change behavior that could affect customer workflows.
+5. Update dependencies that require customer action.
+6. Modify configuration options or environment variables.
+7. Change performance characteristics that impact users.
 
-Ignore commits unrelated to API consumers, such as:
-- Internal refactoring or code cleanup.
-- Changes to internal tools or build processes.
-- Documentation updates that don't affect API behavior.
-- Non-functional changes like formatting or comments.
+Ignore commits that are purely:
+- Internal refactoring without behavioral changes
+- Code cleanup or formatting
+- Build process changes without user impact
+- Documentation fixes for typos
+- Test updates without feature changes
 
 Analyze the following commit data:
 ${JSON.stringify(formattedCommits, null, 2)}
@@ -60,7 +70,7 @@ ${JSON.stringify(formattedCommits, null, 2)}
     const cleanedApiChangesStr = cleanLLMResponse(apiChangesStr);
     return safeJSONParse(cleanedApiChangesStr);
   } catch (error) {
-    console.error("Error filtering API changes:", error);
+    console.error("Error filtering customer-impacting changes:", error);
     throw error;
   }
 };
