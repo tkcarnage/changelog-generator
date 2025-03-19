@@ -16,7 +16,7 @@ export const generateReadableChangelog = async (apiChanges) => {
   const prompt = `
 You are an AI assistant tasked with converting API changes into a user-readable changelog format.
 The users of this changelog are developers consuming the API provided by this codebase.
-The changelog should follow a format similar to Stripe's changelog:
+The changelog should follow a format:
 - Group changes by type (e.g., "New Features", "Bug Fixes", "Breaking Changes").
 - Use a clear and concise title for each change.
 - Provide a brief description of the change, including any relevant details.
@@ -35,11 +35,6 @@ Here are examples of how the changelog should be formatted:
   Resolved an issue where incorrect error codes were returned for certain payment failures.  
   **Action Required**: No action required.
 
-## Breaking Changes
-- **Deprecated Legacy Authentication Method**  
-  The legacy authentication method has been deprecated and will be removed in the next major release.  
-  **Action Required**: Migrate to the new OAuth-based authentication method before the deprecation date.
-
 Here is the data for analysis:
 ${JSON.stringify(apiChanges, null, 2)}
 `;
@@ -47,7 +42,7 @@ ${JSON.stringify(apiChanges, null, 2)}
   try {
     const response = await sendChatPrompt(
       prompt,
-      "gpt-4o-mini",
+      "gpt-4o",
       0.3,
       changelogSchema
     );

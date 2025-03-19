@@ -104,10 +104,12 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
           html_url: repoInfo.html_url,
           defaultBranch: repoInfo.default_branch,
           updated_at: repoInfo.updated_at,
-          license: repoInfo.license ? {
-            name: repoInfo.license.name,
-            url: repoInfo.license.url,
-          } : undefined,
+          license: repoInfo.license
+            ? {
+                name: repoInfo.license.name,
+                url: repoInfo.license.url,
+              }
+            : undefined,
         },
       },
       { new: true, upsert: true }
@@ -217,7 +219,8 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
     });
 
     // Process API changes in chunks in parallel
-    const apiChangeChunks = _.chunk(processedCommits, chunkSize);
+    const chunkllmSize = 10;
+    const apiChangeChunks = _.chunk(processedCommits, chunkllmSize);
     let allApiChanges = { changes: [] };
 
     // Process all chunks in parallel
@@ -233,7 +236,7 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
 
     // Wait for all chunks to be processed
     const allChanges = await Promise.all(chunkPromises);
-    
+
     // Combine all changes
     allApiChanges.changes = allChanges.flat();
 
@@ -243,7 +246,7 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
       const dateB = new Date(b.mergedAt || 0);
       return dateB - dateA; // newest first
     });
-    allApiChanges.changes = _.uniqBy(allApiChanges.changes, 'title');
+    allApiChanges.changes = _.uniqBy(allApiChanges.changes, "title");
 
     sendProgress(clientId, {
       progress: 90,
@@ -271,7 +274,10 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
         const existingSection = sectionMap.get(newSection.type);
         if (existingSection) {
           // Merge changes into existing section
-          existingSection.changes = [...existingSection.changes, ...newSection.changes];
+          existingSection.changes = [
+            ...existingSection.changes,
+            ...newSection.changes,
+          ];
           sectionMap.set(newSection.type, existingSection);
         } else {
           // Add new section
