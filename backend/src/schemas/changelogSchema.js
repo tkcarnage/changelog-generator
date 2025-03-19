@@ -1,16 +1,6 @@
 export const changelogSchema = {
   type: "object",
   properties: {
-    repository: {
-      type: "object",
-      properties: {
-        owner: { type: "string" },
-        name: { type: "string" },
-        full_name: { type: "string" },
-      },
-      required: ["owner", "name", "full_name"],
-    },
-    timestamp: { type: "string", format: "date-time" },
     sections: {
       type: "array",
       minItems: 5,
@@ -71,6 +61,6 @@ export const changelogSchema = {
       uniqueItems: true,
     },
   },
-  required: ["repository", "timestamp", "sections"],
+  required: ["sections"],
   additionalProperties: false,
 };

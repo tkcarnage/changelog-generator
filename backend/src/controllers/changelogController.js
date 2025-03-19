@@ -86,6 +86,33 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
     const repoInfo = await getRepositoryInfo(octokit, owner, repo);
     sendProgress(clientId, { progress: 20, step: "Processing commits..." });
 
+    // First save/update the repository to get its ID
+    const repository = await Repository.findOneAndUpdate(
+      { "owner.login": owner, name: repo },
+      {
+        $set: {
+          owner: {
+            login: owner,
+            avatar_url: repoInfo.owner.avatar_url,
+          },
+          name: repo,
+          full_name: `${owner}/${repo}`,
+          description: repoInfo.description,
+          stargazers_count: repoInfo.stargazers_count,
+          language: repoInfo.language,
+          topics: repoInfo.topics,
+          html_url: repoInfo.html_url,
+          defaultBranch: repoInfo.default_branch,
+          updated_at: repoInfo.updated_at,
+          license: repoInfo.license ? {
+            name: repoInfo.license.name,
+            url: repoInfo.license.url,
+          } : undefined,
+        },
+      },
+      { new: true, upsert: true }
+    );
+
     // Get commits within date range
     const since =
       startDate ||
@@ -114,33 +141,6 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
       }
       page++;
     }
-
-    // First save/update the repository to get its ID
-    const repository = await Repository.findOneAndUpdate(
-      { "owner.login": owner, name: repo },
-      {
-        $set: {
-          name: repoInfo.name,
-          full_name: `${owner}/${repo}`,
-          description: repoInfo.description,
-          "owner.login": owner,
-          "owner.avatar_url": repoInfo.owner.avatar_url,
-          html_url: repoInfo.html_url,
-          stargazers_count: repoInfo.stargazers_count,
-          language: repoInfo.language,
-          topics: repoInfo.topics,
-          updated_at: repoInfo.updated_at,
-          default_branch: repoInfo.default_branch,
-          license: repoInfo.license
-            ? {
-                name: repoInfo.license.name,
-                url: repoInfo.license.url,
-              }
-            : null,
-        },
-      },
-      { new: true, upsert: true }
-    );
 
     // Save all raw commits before processing
     const commitSavePromises = allCommits.map(async (commit) => {
@@ -206,38 +206,64 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
         octokit,
         owner,
         repo,
-        repoInfo.defaultBranch
+        repoInfo.default_branch
       );
       processedCommits.push(...processedChunk);
     }
 
     sendProgress(clientId, {
       progress: 80,
-      step: "Filtering API changes...",
+      step: `Analyzing changes in parallel...`,
     });
 
-    const apiChanges = await filterApiChanges(processedCommits, { owner, repo });
+    // Process API changes in chunks in parallel
+    const apiChangeChunks = _.chunk(processedCommits, chunkSize);
+    let allApiChanges = { changes: [] };
+
+    // Process all chunks in parallel
+    const chunkPromises = apiChangeChunks.map(async (chunk) => {
+      try {
+        const chunkChanges = await filterApiChanges(chunk);
+        return chunkChanges?.changes || [];
+      } catch (error) {
+        console.error(`Error processing API changes chunk:`, error);
+        return [];
+      }
+    });
+
+    // Wait for all chunks to be processed
+    const allChanges = await Promise.all(chunkPromises);
+    
+    // Combine all changes
+    allApiChanges.changes = allChanges.flat();
+
+    // Sort changes by date and remove duplicates
+    allApiChanges.changes.sort((a, b) => {
+      const dateA = new Date(a.mergedAt || 0);
+      const dateB = new Date(b.mergedAt || 0);
+      return dateB - dateA; // newest first
+    });
+    allApiChanges.changes = _.uniqBy(allApiChanges.changes, 'title');
 
     sendProgress(clientId, {
       progress: 90,
-      step: "Generating readable changelog...",
+      step: "Generating changelog...",
     });
 
-    const changelog = await generateReadableChangelog(apiChanges);
-    console.log("Generated changelog:", changelog);
+    // Generate the final changelog
+    const changelog = await generateReadableChangelog(allApiChanges);
 
-    // Find existing repository to get current changelog
-    const existingRepo = await Repository.findOne({
-      "owner.login": owner,
-      name: repo,
+    sendProgress(clientId, {
+      progress: 100,
+      step: "Changelog generated successfully!",
     });
 
     // Merge new changes with existing sections
     let mergedSections = [];
-    if (existingRepo?.changelog?.sections) {
+    if (repository?.changelog?.sections) {
       // Create a map of existing sections by type
       const sectionMap = new Map(
-        existingRepo.changelog.sections.map((section) => [section.type, section])
+        repository.changelog.sections.map((section) => [section.type, section])
       );
 
       // Merge new sections with existing ones
@@ -272,11 +298,6 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
       },
       { new: true, upsert: true }
     );
-
-    sendProgress(clientId, {
-      progress: 100,
-      step: "Complete",
-    });
 
     res.json({
       success: true,
