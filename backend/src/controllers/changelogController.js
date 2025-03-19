@@ -92,12 +92,28 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
       new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
     const until = endDate || new Date().toISOString();
 
-    const { data: commits } = await octokit.repos.listCommits({
-      owner,
-      repo,
-      since,
-      until,
-    });
+    let allCommits = [];
+    let page = 1;
+    const per_page = 100; // Maximum allowed by GitHub API
+
+    while (true) {
+      const { data: commits } = await octokit.repos.listCommits({
+        owner,
+        repo,
+        since,
+        until,
+        per_page,
+        page,
+      });
+
+      allCommits.push(...commits);
+
+      // If we got less than per_page items, we've reached the end
+      if (commits.length < per_page) {
+        break;
+      }
+      page++;
+    }
 
     // First save/update the repository to get its ID
     const repository = await Repository.findOneAndUpdate(
@@ -127,7 +143,7 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
     );
 
     // Save all raw commits before processing
-    const commitSavePromises = commits.map(async (commit) => {
+    const commitSavePromises = allCommits.map(async (commit) => {
       const prInfo = await getPRForCommit(octokit, owner, repo, commit.sha);
       const commitDetails = await getCommitDetails(
         octokit,
@@ -169,8 +185,8 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
     await Promise.all(commitSavePromises);
 
     // Process commits in chunks
-    const chunkSize = 5;
-    const commitChunks = _.chunk(commits, chunkSize);
+    const chunkSize = 20;
+    const commitChunks = _.chunk(allCommits, chunkSize);
     const processedCommits = [];
 
     for (let i = 0; i < commitChunks.length; i++) {
@@ -180,8 +196,8 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
         progress,
         step: `Processing commits (${i * chunkSize + 1}-${Math.min(
           (i + 1) * chunkSize,
-          commits.length
-        )} of ${commits.length})...`,
+          allCommits.length
+        )} of ${allCommits.length})...`,
       });
 
       const processedChunk = await processCommitChunk(
