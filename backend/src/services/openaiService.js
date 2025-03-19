@@ -15,6 +15,31 @@ const INITIAL_RETRY_DELAY = 1000; // 1 second
 const MODEL_NAME = "gpt-4o-mini"; // Standardized model name
 
 /**
+ * Formats the system prompt to ensure proper JSON response
+ * @param {string} basePrompt - The base prompt content
+ * @param {Object} jsonFormat - The expected JSON format
+ * @returns {string} - The formatted system prompt
+ */
+const formatSystemPrompt = (basePrompt, jsonFormat) => {
+  const systemPrompt = `You are a technical changelog generator assistant. Your task is to analyze code changes and generate clear, actionable changelogs. Your responses must:
+1. ALWAYS be in valid JSON format
+2. NEVER include markdown code blocks or language specifiers
+3. NEVER include any explanatory text outside the JSON
+4. Follow the exact schema provided
+5. Focus on customer-facing API changes and their impacts
+6. Be clear and specific about any required actions
+
+${basePrompt}
+
+Response Format:
+${JSON.stringify(jsonFormat, null, 2)}
+
+Remember: Return ONLY the JSON object, nothing else.`;
+
+  return systemPrompt;
+};
+
+/**
  * Implements exponential backoff retry logic
  * @param {Function} operation - Function to retry
  * @param {number} maxRetries - Maximum number of retries
@@ -55,29 +80,10 @@ const withRetry = async (
 };
 
 /**
- * Formats the system prompt to ensure proper JSON response
- * @param {string} basePrompt - The base prompt content
- * @param {Object} jsonFormat - The expected JSON format
- * @returns {string} - The formatted system prompt
- */
-const formatSystemPrompt = (basePrompt, jsonFormat) => {
-  const systemPrompt = `
-
-${basePrompt}
-
-Response Format:
-${JSON.stringify(jsonFormat, null, 2)}
-
-Remember: Return ONLY the JSON object, nothing else.`;
-
-  return systemPrompt;
-};
-
-/**
  * Sends a prompt to OpenAI's chat completions endpoint and returns the response content.
  * @param {string} prompt - The prompt content.
  * @param {string} [model=MODEL_NAME] - The model to use.
- * @param {number} [temperature=0.3] - The sampling temperature.
+ * @param {number} [temperature=0.1] - The sampling temperature.
  * @param {Object} [jsonFormat] - The expected JSON format to include in the prompt.
  * @returns {Promise<string>} - The message content from OpenAI's response.
  */
@@ -98,7 +104,8 @@ export const sendChatPrompt = async (
     },
     {
       role: "user",
-      content: "Generate the json following the exact format specified.",
+      content:
+        "Analyze the provided code changes and generate a clear, actionable changelog following the exact format specified.",
     },
   ];
 
