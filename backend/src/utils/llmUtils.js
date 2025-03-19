@@ -5,7 +5,10 @@
  */
 export const cleanLLMResponse = (response) => {
   // Remove markdown code blocks and any language specifiers
-  const withoutCodeBlocks = response.replace(/```(?:json)?\s*([\s\S]*?)\s*```/g, '$1');
+  const withoutCodeBlocks = response.replace(
+    /```(?:json)?\s*([\s\S]*?)\s*```/g,
+    "$1"
+  );
   // Trim any extra whitespace
   return withoutCodeBlocks.trim();
 };

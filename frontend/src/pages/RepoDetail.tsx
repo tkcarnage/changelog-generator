@@ -100,14 +100,16 @@ export default function RepoDetail() {
                 </div>
                 {changelog.sections.map((section, sectionIndex) => (
                   <div key={sectionIndex} className="space-y-4">
-                    <h4 className={cn(
-                      "text-lg font-semibold px-4 py-2 rounded-md inline-block",
-                      section.type === 'Breaking Changes' ? "bg-red-900/50 text-red-200" :
-                      section.type === 'New Features' ? "bg-green-900/50 text-green-200" :
-                      "bg-blue-900/50 text-blue-200"
-                    )}>
-                      {section.type}
-                    </h4>
+                    {section.changes?.length > 0 && (
+                      <h4 className={cn(
+                        "text-lg font-semibold px-4 py-2 rounded-md inline-block",
+                        section.type === 'Breaking Changes' ? "bg-red-900/50 text-red-200" :
+                        section.type === 'New Features' ? "bg-green-900/50 text-green-200" :
+                        "bg-blue-900/50 text-blue-200"
+                      )}>
+                        {section.type}
+                      </h4>
+                    )}
                     <div className="space-y-4">
                       {section.changes.map((change, changeIndex) => (
                         <div key={changeIndex} className="bg-slate-800/30 rounded-lg p-4">

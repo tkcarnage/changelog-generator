@@ -49,9 +49,14 @@ ${JSON.stringify(formattedCommits, null, 2)}
   `;
 
   try {
-    const apiChangesStr = await sendChatPrompt(prompt, "gpt-4o-mini", 0.1, apiChangesSchema);
+    const apiChangesStr = await sendChatPrompt(
+      prompt,
+      "gpt-4o-mini",
+      0.3,
+      apiChangesSchema
+    );
     console.log("raw apiChangesStr:", apiChangesStr);
-    
+
     const cleanedApiChangesStr = cleanLLMResponse(apiChangesStr);
     return safeJSONParse(cleanedApiChangesStr);
   } catch (error) {

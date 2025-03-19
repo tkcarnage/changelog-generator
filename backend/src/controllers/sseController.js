@@ -82,7 +82,9 @@ export const changelogProgress = (req, res) => {
     // Check if this was an expected disconnection (after completion)
     const client = clients.get(clientId);
     if (client && client._isComplete) {
-      console.log(`Client ${clientId} disconnected after successful completion`);
+      console.log(
+        `Client ${clientId} disconnected after successful completion`
+      );
     } else {
       console.log(`Client ${clientId} disconnected unexpectedly`);
     }

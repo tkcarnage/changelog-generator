@@ -56,16 +56,16 @@ export const addRepository = async (req, res, next) => {
 
     // Try to find existing repository
     const existingRepo = await Repository.findOne({ owner: owner, name: name });
-    
+
     if (existingRepo) {
       // Update existing repository
       const updatedRepo = await Repository.findByIdAndUpdate(
         existingRepo._id,
-        { 
-          $set: { 
+        {
+          $set: {
             ...req.body,
-            lastGeneratedAt: existingRepo.lastGeneratedAt // Preserve the last generated time
-          }
+            lastGeneratedAt: existingRepo.lastGeneratedAt, // Preserve the last generated time
+          },
         },
         { new: true, runValidators: true }
       );

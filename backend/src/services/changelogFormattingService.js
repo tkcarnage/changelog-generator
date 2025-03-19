@@ -40,15 +40,20 @@ ${JSON.stringify(apiChanges, null, 2)}
   `;
 
   try {
-    const changelogStr = await sendChatPrompt(prompt, "gpt-4o-mini", 0.3, changelogSchema);
+    const changelogStr = await sendChatPrompt(
+      prompt,
+      "gpt-4o-mini",
+      0.3,
+      changelogSchema
+    );
     console.log("Raw LLM response:", changelogStr);
-    
+
     const cleanedResponse = cleanLLMResponse(changelogStr);
     console.log("Cleaned response:", cleanedResponse);
-    
+
     const parsedChangelog = safeJSONParse(cleanedResponse);
     console.log("Parsed changelog:", parsedChangelog);
-    
+
     return parsedChangelog;
   } catch (error) {
     console.error("Error generating readable changelog:", error);

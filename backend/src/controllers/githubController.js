@@ -52,11 +52,12 @@ export const getRepositoryInfo = async (octokit, owner, repo) => {
 export const getPRForCommit = async (octokit, owner, repo, commitSha) => {
   try {
     console.log(`Fetching PR info for commit: ${commitSha}`);
-    const { data: prs } = await octokit.repos.listPullRequestsAssociatedWithCommit({
-      owner,
-      repo,
-      commit_sha: commitSha,
-    });
+    const { data: prs } =
+      await octokit.repos.listPullRequestsAssociatedWithCommit({
+        owner,
+        repo,
+        commit_sha: commitSha,
+      });
 
     if (prs.length > 0) {
       const pr = prs[0];

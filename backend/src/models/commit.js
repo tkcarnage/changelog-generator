@@ -2,14 +2,14 @@ import mongoose from "mongoose";
 
 const CommitSchema = new mongoose.Schema(
   {
-    sha: { 
-      type: String, 
+    sha: {
+      type: String,
       required: true,
-      unique: true 
+      unique: true,
     },
-    message: { 
-      type: String, 
-      required: true 
+    message: {
+      type: String,
+      required: true,
     },
     repository: {
       type: mongoose.Schema.Types.ObjectId,

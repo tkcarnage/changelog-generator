@@ -1,8 +1,6 @@
 import express from "express";
 import { home } from "../controllers/homeController.js";
-import {
-  getCommitAndGenerateChangeLog,
-} from "../controllers/changelogController.js";
+import { getCommitAndGenerateChangeLog } from "../controllers/changelogController.js";
 import { changelogProgress } from "../controllers/sseController.js";
 import {
   getStoredRepositories,

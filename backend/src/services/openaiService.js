@@ -21,29 +21,36 @@ const MODEL_NAME = "gpt-4o-mini"; // Standardized model name
  * @param {number} initialDelay - Initial delay in milliseconds
  * @returns {Promise<any>} - Result of the operation
  */
-const withRetry = async (operation, maxRetries = MAX_RETRIES, initialDelay = INITIAL_RETRY_DELAY) => {
+const withRetry = async (
+  operation,
+  maxRetries = MAX_RETRIES,
+  initialDelay = INITIAL_RETRY_DELAY
+) => {
   let lastError;
-  
+
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       return await operation();
     } catch (error) {
       lastError = error;
-      
+
       if (attempt === maxRetries) break;
-      
+
       // Check if error is rate limit related
-      const isRateLimit = error.response?.status === 429 || 
-                         error.message.toLowerCase().includes('rate limit');
-      
+      const isRateLimit =
+        error.response?.status === 429 ||
+        error.message.toLowerCase().includes("rate limit");
+
       if (!isRateLimit) throw error;
-      
+
       const delay = initialDelay * Math.pow(2, attempt);
-      console.log(`Rate limit hit. Retrying in ${delay}ms... (Attempt ${attempt + 1}/${maxRetries})`);
-      await new Promise(resolve => setTimeout(resolve, delay));
+      console.log(
+        `Rate limit hit. Retrying in ${delay}ms... (Attempt ${attempt + 1}/${maxRetries})`
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
-  
+
   throw lastError;
 };
 
@@ -54,7 +61,7 @@ const withRetry = async (operation, maxRetries = MAX_RETRIES, initialDelay = INI
  * @returns {string} - The formatted system prompt
  */
 const formatSystemPrompt = (basePrompt, jsonFormat) => {
-  const systemPrompt = `You are a helpful assistant that generates a JSON object based on the provided prompt.
+  const systemPrompt = `
 
 ${basePrompt}
 
@@ -91,7 +98,7 @@ export const sendChatPrompt = async (
     },
     {
       role: "user",
-      content: "Generate the changelog following the exact format specified.",
+      content: "Generate the json following the exact format specified.",
     },
   ];
 
@@ -105,7 +112,10 @@ export const sendChatPrompt = async (
   // Log token count for debugging
   const tokenCount = calculateTokenCount(systemPrompt);
   console.log(`Token count for the prompt: ${tokenCount}`);
-  console.log("Payload being sent to OpenAI:", JSON.stringify(payload, null, 2));
+  console.log(
+    "Payload being sent to OpenAI:",
+    JSON.stringify(payload, null, 2)
+  );
 
   return await withRetry(async () => {
     const response = await openai.createChatCompletion(payload);
