@@ -32,52 +32,19 @@ export const filterApiChanges = async (commitData) => {
 
   // Construct the prompt
   const prompt = `
-You are an AI assistant tasked with identifying changes in the repository that might be relevant to users or consumers of the codebase.
+You are an AI assistant tasked with identifying **customer-facing API changes** from the provided commit data.
+Focus on commits that:
+1. Modify API endpoints, request/response formats, authentication, or error handling.
+2. Introduce breaking changes or deprecate existing functionality.
+3. Add new API routes, parameters, or features visible to customers.
 
-Consider including any changes that:
-1. Modify or add new functionality
-2. Change behavior or interfaces
-3. Affect how users interact with the code
-4. Update dependencies or configurations
-5. Fix bugs or issues
+Ignore commits unrelated to API consumers, such as:
+- Internal refactoring or code cleanup.
+- Changes to internal tools or build processes.
+- Documentation updates that don't affect API behavior.
+- Non-functional changes like formatting or comments.
 
-Only exclude changes that are purely:
-- Code formatting or style changes
-- Internal comments
-- Test files without implementation changes
-
-If there are ANY potentially relevant changes, include them in the response. If truly nothing relevant is found, respond only with "No action required".
-
-Return the response in this JSON structure:
-{
-  "apiChanges": [
-    {
-      "branchName": "string",
-      "prTitle": "string",
-      "prDescription": "string",
-      "mergedAt": "date-time string",
-      "summary": "string describing the change",
-      "breakingChange": boolean,
-      "commits": [
-        {
-          "sha": "string",
-          "message": "string",
-          "date": "date-time string",
-          "rawDiff": "string",
-          "files": [
-            {
-              "filename": "string",
-              "status": "string",
-              "changes": number
-            }
-          ]
-        }
-      ]
-    }
-  ]
-}
-
-Commit data to analyze:
+Analyze the following commit data:
 ${JSON.stringify(formattedCommits, null, 2)}
 `;
 
@@ -92,10 +59,10 @@ ${JSON.stringify(formattedCommits, null, 2)}
 
     const cleanedApiChangesStr = cleanLLMResponse(apiChangesStr);
     const parsed = safeJSONParse(cleanedApiChangesStr);
-    
+
     // Ensure we return the correct structure
     return {
-      changes: parsed.apiChanges || []
+      changes: parsed.apiChanges || [],
     };
   } catch (error) {
     console.error("Error filtering API changes:", error);

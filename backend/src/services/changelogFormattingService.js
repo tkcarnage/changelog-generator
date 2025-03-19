@@ -16,32 +16,29 @@ export const generateReadableChangelog = async (apiChanges) => {
   const prompt = `
 You are an AI assistant tasked with converting API changes into a user-readable changelog format.
 The users of this changelog are developers consuming the API provided by this codebase.
+The changelog should follow a format similar to Stripe's changelog:
+- Group changes by type (e.g., "New Features", "Bug Fixes", "Breaking Changes").
+- Use a clear and concise title for each change.
+- Provide a brief description of the change, including any relevant details.
+- Indicate whether the change is a breaking change.
+- Include steps developers need to take to update their code if necessary.
 
-IMPORTANT: Categorize each change into these sections:
+Here are examples of how the changelog should be formatted:
 
-1. "New Features" - New endpoints, parameters, or functionality
-2. "Bug Fixes" - Corrections to API behavior, error handling, or performance
-3. "Breaking Changes" - Changes requiring client code updates (removed/renamed endpoints, modified parameters/responses)
-4. "Documentation" - API docs, examples, guides, or schema updates
-5. "Other" - Internal changes without API impact
+## New Features
+- **Support for Webhooks in API v2**  
+  Webhooks are now supported in API v2, allowing developers to receive real-time notifications for specific events.  
+  **Action Required**: Update your integration to handle webhook events.
 
-For each change, provide:
-1. Clear, concise title summarizing the change
-2. Detailed description including:
-   - What changed (parameters, types, behavior)
-   - Why it changed (context)
-   - Impact on API consumers
-   - Important limitations or notes
-   - Performance implications if relevant
-3. Action Required section:
-   - "No action required" if no changes needed
-   - Step-by-step instructions if action needed
+## Bug Fixes
+- **Fixed Incorrect Error Codes for Payment Failures**  
+  Resolved an issue where incorrect error codes were returned for certain payment failures.  
+  **Action Required**: No action required.
 
-Format each change as:
-## Category
-- **Title**
-  Description: [detailed explanation]
-  **Action Required**: [steps or "No action required"]
+## Breaking Changes
+- **Deprecated Legacy Authentication Method**  
+  The legacy authentication method has been deprecated and will be removed in the next major release.  
+  **Action Required**: Migrate to the new OAuth-based authentication method before the deprecation date.
 
 Here is the data for analysis:
 ${JSON.stringify(apiChanges, null, 2)}
