@@ -16,12 +16,24 @@ export const generateReadableChangelog = async (apiChanges) => {
   const prompt = `
 You are an AI assistant tasked with converting API changes into a user-readable changelog format.
 The users of this changelog are developers consuming the API provided by this codebase.
-The changelog should follow a format:
-- Group changes by type (e.g., "New Features", "Bug Fixes", "Breaking Changes").
-- Use a clear and concise title for each change.
-- Provide a brief description of the change, including any relevant details.
-- Indicate whether the change is a breaking change.
-- Include steps developers need to take to update their code if necessary.
+
+IMPORTANT: You MUST categorize ALL changes provided in the input. Do not skip or filter out any changes.
+Each change MUST be placed into one of these categories: "New Features", "Bug Fixes", "Breaking Changes", "Documentation", or "Other".
+
+The changelog should follow this format:
+1. Group ALL changes by type into these sections:
+   - New Features (new functionality, enhancements, additions)
+   - Bug Fixes (error corrections, issue resolutions)
+   - Breaking Changes (backward incompatible changes)
+   - Documentation (docs, guides, examples)
+   - Other (internal improvements, refactoring)
+
+2. For EACH change in the input:
+   - Write a clear, concise title
+   - Provide a brief but informative description
+   - Include any action required by developers
+   - Preserve the original mergedAt date
+   - List affected files
 
 Here are examples of how the changelog should be formatted:
 

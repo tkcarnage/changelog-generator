@@ -223,13 +223,28 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
     const apiChangeChunks = _.chunk(processedCommits, chunkllmSize);
     let allApiChanges = { changes: [] };
 
+    console.log(`Processing ${apiChangeChunks.length} chunks of size ${chunkllmSize}`);
+
     // Process all chunks in parallel
-    const chunkPromises = apiChangeChunks.map(async (chunk) => {
+    const chunkPromises = apiChangeChunks.map(async (chunk, index) => {
       try {
+        console.log(`\nProcessing chunk ${index + 1}/${apiChangeChunks.length}`);
+        console.log('Chunk commits:', chunk.map(c => ({ 
+          sha: c.sha.substring(0, 7), 
+          message: c.message.split('\n')[0],
+          date: c.date
+        })));
+        
         const chunkChanges = await filterApiChanges(chunk);
+        console.log(`Filtered changes from chunk ${index + 1}:`, 
+          chunkChanges?.changes?.map(c => ({
+            title: c.prTitle,
+            mergedAt: c.mergedAt
+          })) || []
+        );
         return chunkChanges?.changes || [];
       } catch (error) {
-        console.error(`Error processing API changes chunk:`, error);
+        console.error(`Error processing API changes chunk ${index + 1}:`, error);
         return [];
       }
     });
@@ -239,14 +254,27 @@ export const getCommitAndGenerateChangeLog = async (req, res) => {
 
     // Combine all changes
     allApiChanges.changes = allChanges.flat();
+    
+    console.log('\nAll changes before sorting:', 
+      allApiChanges.changes.map(c => ({
+        title: c.prTitle,
+        mergedAt: c.mergedAt
+      }))
+    );
 
-    // Sort changes by date and remove duplicates
+    // Sort changes by date
     allApiChanges.changes.sort((a, b) => {
       const dateA = new Date(a.mergedAt || 0);
       const dateB = new Date(b.mergedAt || 0);
       return dateB - dateA; // newest first
     });
-    allApiChanges.changes = _.uniqBy(allApiChanges.changes, "title");
+    
+    console.log('\nChanges after sorting:', 
+      allApiChanges.changes.map(c => ({
+        title: c.prTitle,
+        mergedAt: c.mergedAt
+      }))
+    );
 
     sendProgress(clientId, {
       progress: 90,
